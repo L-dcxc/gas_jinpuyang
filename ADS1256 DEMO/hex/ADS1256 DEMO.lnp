@@ -1,0 +1,8 @@
+"..\hex\STARTUP.obj",
+"..\hex\delay.obj",
+"..\hex\IO.obj",
+"..\hex\MAIN.obj",
+"..\hex\uart.obj",
+"..\hex\ads1256.obj" 
+TO "..\hex\ADS1256 DEMO" 
+PRINT(".\list\ADS1256 DEMO.m51") RAMSIZE(256) 

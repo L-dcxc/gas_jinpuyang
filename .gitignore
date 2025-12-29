@@ -1,0 +1,42 @@
+# Keil/MDK-ARM build outputs
+MDK-ARM/Objects/
+MDK-ARM/Listings/
+MDK-ARM/RTE/
+MDK-ARM/*.axf
+MDK-ARM/*.hex
+MDK-ARM/*.bin
+MDK-ARM/*.map
+MDK-ARM/*.lnp
+MDK-ARM/*.d
+MDK-ARM/*.o
+MDK-ARM/*.crf
+MDK-ARM/*.htm
+MDK-ARM/*.plg
+MDK-ARM/*.tra
+MDK-ARM/*.dep
+MDK-ARM/*.iex
+MDK-ARM/*.icf
+MDK-ARM/*.sct
+MDK-ARM/JLinkLog.txt
+MDK-ARM/*.uvoptx
+MDK-ARM/*.uvguix
+
+# Generic build artifacts
+*.o
+*.d
+*.axf
+*.elf
+*.map
+*.hex
+*.bin
+*.lst
+*.log
+*.tmp
+*.bak
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1 @@
+"..\scr\delay.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\scr) DEBUG OBJECTEXTEND PRINT(.\list\delay.lst) OBJECT(..\hex\delay.obj)

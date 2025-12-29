@@ -1,0 +1,1 @@
+"..\scr\uart.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\scr) DEBUG OBJECTEXTEND PRINT(.\list\uart.lst) OBJECT(..\hex\uart.obj)

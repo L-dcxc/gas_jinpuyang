@@ -1,0 +1,1 @@
+"..\scr\ads1256.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\scr) DEBUG OBJECTEXTEND PRINT(.\list\ads1256.lst) OBJECT(..\hex\ads1256.obj)

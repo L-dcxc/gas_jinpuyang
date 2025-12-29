@@ -1,0 +1,1 @@
+"..\scr\IO.c" OPTIMIZE (8,SPEED) BROWSE INCDIR(..\scr) DEBUG OBJECTEXTEND PRINT(.\list\IO.lst) OBJECT(..\hex\IO.obj)
