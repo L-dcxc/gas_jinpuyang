@@ -22,6 +22,7 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "modbus_rtu_slave.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -234,6 +235,12 @@ void USART1_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
+  if ((__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET) &&
+      (__HAL_UART_GET_IT_SOURCE(&huart2, UART_IT_IDLE) != RESET))
+  {
+    __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+    ModbusRTUSlave_OnIdle();
+  }
 
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);

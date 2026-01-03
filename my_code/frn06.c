@@ -12,6 +12,10 @@
 #define FRN06_OFFSET_DEFAULT 30000L
 #define FRN06_SCALE_DEFAULT  2500L
 
+#ifndef FRN06_ZERO_DEADBAND_MSLM
+#define FRN06_ZERO_DEADBAND_MSLM 10L
+#endif
+
 static uint8_t frn06_crc8_poly131(const uint8_t *data, uint32_t len)
 {
   uint8_t crc = 0x00;
@@ -102,6 +106,10 @@ HAL_StatusTypeDef FRN06_ReadFlow_mslm(int32_t *flow_mslm)
     }
 
     *flow_mslm = (int32_t)(num / den);
+    if (*flow_mslm <= (int32_t)FRN06_ZERO_DEADBAND_MSLM && *flow_mslm >= (int32_t)(-FRN06_ZERO_DEADBAND_MSLM))
+    {
+      *flow_mslm = 0;
+    }
   }
 
   return HAL_OK;

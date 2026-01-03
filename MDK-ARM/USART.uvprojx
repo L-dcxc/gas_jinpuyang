@@ -391,6 +391,31 @@
           <GroupName>Application/User/Core</GroupName>
           <Files>
             <File>
+              <FileName>ads1256.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../my_code/ads1256.c</FilePath>
+            </File>
+            <File>
+              <FileName>frn06.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../my_code/frn06.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../my_code/pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>flow_ctrl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../my_code/flow_ctrl.c</FilePath>
+            </File>
+            <File>
+              <FileName>modbus_rtu_slave.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../my_code/modbus_rtu_slave.c</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>
@@ -619,26 +644,6 @@
                   </Cads>
                 </FileArmAds>
               </FileOption>
-            </File>
-            <File>
-              <FileName>ads1256.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../my_code/ads1256.c</FilePath>
-            </File>
-            <File>
-              <FileName>frn06.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../my_code/frn06.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../my_code/pid.c</FilePath>
-            </File>
-            <File>
-              <FileName>flow_ctrl.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../my_code/flow_ctrl.c</FilePath>
             </File>
             <File>
               <FileName>usart.c</FileName>

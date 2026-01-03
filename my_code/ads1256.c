@@ -7,6 +7,7 @@
 static void ads1256_cs_low(void);
 static void ads1256_cs_high(void);
 static uint8_t ads1256_spi_txrx(uint8_t data);
+static void ads1256_short_delay(void);
 static void ads1256_cmd(uint8_t cmd);
 static void ads1256_write_reg(uint8_t reg, uint8_t value);
 static uint8_t ads1256_read_reg(uint8_t reg);
@@ -42,11 +43,11 @@ static int ads1256_wait_drdy_low(uint32_t timeout_ms);
 #define ADS1256_INPUT_SCALE_NUM 2
 #define ADS1256_INPUT_SCALE_DEN 1
 
-#define ADS1256_DRATE_CODE   0x13
+#define ADS1256_DRATE_CODE   0x23
 #define ADS1256_DISCARD_SAMPLES 1
 #define ADS1256_AVG_SAMPLES  1
 #define ADS1256_USED_CHANNELS 4
-#define ADS1256_MOVAVG_WIN   8
+#define ADS1256_MOVAVG_WIN   1
 
 volatile int32_t g_ads1256_latest_raw[ADS1256_USED_CHANNELS] = {0};
 volatile int32_t g_ads1256_latest_uv[ADS1256_USED_CHANNELS] = {0};
@@ -76,14 +77,14 @@ static int32_t ads1256_read_raw_current_mux(void)
   (void)ads1256_spi_txrx(ADS1256_CMD_SYNC);
   (void)ads1256_spi_txrx(ADS1256_CMD_WAKEUP);
 
-  if (!ads1256_wait_drdy_low(5000))
+  if (!ads1256_wait_drdy_low(300))
   {
     ads1256_cs_high();
     return (int32_t)0x80000000;
   }
 
   (void)ads1256_spi_txrx(ADS1256_CMD_RDATA);
-  HAL_Delay(1);
+  ads1256_short_delay();
 
   b0 = ads1256_spi_txrx(0xFF);
   b1 = ads1256_spi_txrx(0xFF);
@@ -145,6 +146,8 @@ void ADS1256_Update(void)
     int32_t raw = ads1256_read_raw_ainx_aincom_filtered(ch);
     if (raw == (int32_t)0x80000000)
     {
+      g_ads1256_latest_raw[ch] = (int32_t)0x80000000;
+      g_ads1256_latest_uv[ch] = (int32_t)0x80000000;
       continue;
     }
 

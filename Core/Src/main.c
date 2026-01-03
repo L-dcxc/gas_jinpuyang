@@ -28,9 +28,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
- #include "ads1256.h"
- #include "frn06.h"
- #include "flow_ctrl.h"
+#include "ads1256.h"
+#include "frn06.h"
+#include "flow_ctrl.h"
+#include "modbus_rtu_slave.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,8 +53,10 @@
 
 /* USER CODE BEGIN PV */
 uint8_t rx_buf;
+uint8_t rs485_rx_byte;
 uint32_t frn06_test_last_tick = 0;
 uint32_t flow_ctrl_last_tick = 0;
+uint32_t ads_print_last_tick = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,6 +76,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     if(huart->Instance == USART1) {
         HAL_UART_Transmit(&huart1, &rx_buf, sizeof(rx_buf), 1000);
         HAL_UART_Receive_IT(&huart1, &rx_buf, sizeof(rx_buf));
+    }
+    else if (huart->Instance == USART2) {
+        ModbusRTUSlave_OnByte(rs485_rx_byte);
+        HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
     }
 }
 
@@ -141,6 +148,10 @@ int main(void)
   /* 开启 USART1 接收中断：用于回显测试（验证 RX 接线是否正确） */
   HAL_UART_Receive_IT(&huart1, &rx_buf, sizeof(rx_buf));
 
+  ModbusRTUSlave_Init(&huart2, 1);
+  HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
+  __HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
+
   HAL_SPI_DeInit(&hspi1);
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   (void)HAL_SPI_Init(&hspi1);
@@ -153,7 +164,7 @@ int main(void)
   HAL_GPIO_WritePin(ADS_CS_GPIO_Port, ADS_CS_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(ADS_RST_GPIO_Port, ADS_RST_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RS485_DE_GPIO_Port, RS485_DE_Pin, GPIO_PIN_RESET);
-
+  printf("open is OK!!!\r\n");
   /* 为了避免线路未接/接触不良导致“浮空随机值”，这里在运行时做一次 GPIO 重新配置：
    * - DRDY：输入上拉（未接时稳定为 1；接上后由 ADS1256 驱动）
    * - SPI1 MISO(PA6)：AF 无上下拉（由 ADS1256 DOUT 推挽驱动）
@@ -177,6 +188,8 @@ int main(void)
   FRN06_Init();
   (void)FlowCtrl_Init();
   FlowCtrl_SetTarget_mslm(1000);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -184,6 +197,27 @@ int main(void)
   while (1)
   {
     ADS1256_Update();
+
+    {
+      int32_t uv = ADS1256_GetLatestUv(0);
+      float v = (float)uv / 1000000.0f;
+      float conc;
+      if (v <= 0.4f)
+      {
+        conc = 0.0f;
+      }
+      else if (v >= 2.0f)
+      {
+        conc = 10000.0f;
+      }
+      else
+      {
+        conc = (v - 0.4f) * (10000.0f / 1.6f);
+      }
+      ModbusRTUSlave_SetConcentrationFloat(conc);
+    }
+
+    ModbusRTUSlave_Poll();
 
     if ((HAL_GetTick() - flow_ctrl_last_tick) >= 100U)
     {
@@ -198,9 +232,12 @@ int main(void)
         int32_t target = FlowCtrl_GetTarget_mslm();
         int32_t meas = FlowCtrl_GetMeasured_mslm();
         uint32_t pwm = FlowCtrl_GetPwmCompare();
+        int32_t raw = 0;
+        (void)FRN06_ReadFlowRaw(&raw);
         int32_t abs_target = (target >= 0) ? target : -target;
         int32_t abs_meas = (meas >= 0) ? meas : -meas;
-        printf("FLOW target=%c%ld.%03ld SLM, meas=%c%ld.%03ld SLM, pwm=%lu/%lu\r\n",
+        printf("FLOW raw=%ld, target=%c%ld.%03ld SLM, meas=%c%ld.%03ld SLM, pwm=%lu/%lu\r\n",
+               (long)raw,
                (target < 0) ? '-' : '+',
                (long)(abs_target / 1000L),
                (long)(abs_target % 1000L),
@@ -211,7 +248,46 @@ int main(void)
                (unsigned long)htim4.Init.Period);
       }
     }
-    HAL_Delay(10);
+
+    if ((HAL_GetTick() - ads_print_last_tick) >= 200U)
+    {
+      ads_print_last_tick = HAL_GetTick();
+      {
+        int32_t raw[4];
+        int32_t uv[4];
+        float v[4];
+        float conc[4];
+        GPIO_PinState drdy = HAL_GPIO_ReadPin(ADS_DRDY_GPIO_Port, ADS_DRDY_Pin);
+        uint8_t status = ADS1256_ReadStatus();
+
+        for (uint8_t ch = 0; ch < 4U; ch++)
+        {
+          raw[ch] = ADS1256_GetLatestRaw(ch);
+          uv[ch] = ADS1256_GetLatestUv(ch);
+          v[ch] = (float)uv[ch] / 1000000.0f;
+          if (v[ch] <= 0.4f)
+          {
+            conc[ch] = 0.0f;
+          }
+          else if (v[ch] >= 2.0f)
+          {
+            conc[ch] = 10000.0f;
+          }
+          else
+          {
+            conc[ch] = (v[ch] - 0.4f) * (10000.0f / 1.6f);
+          }
+        }
+
+        printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
+        printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
+               (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
+        printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
+               conc[0], conc[1], conc[2], conc[3]);
+        printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
+               v[0], v[1], v[2], v[3]);
+      }
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
