@@ -3,9 +3,9 @@
 <title>Static Call Graph - [USART\USART.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image USART\USART.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Sat Jan  3 19:23:33 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Sat Jan  3 23:26:25 2026
 <BR><P>
-<H3>Maximum Stack Usage =        768 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
+<H3>Maximum Stack Usage =        776 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
 main &rArr; ModbusRTUSlave_Poll &rArr; process_frame &rArr; send_exception &rArr; HAL_UART_Transmit
 <P>
@@ -390,7 +390,8 @@ Global Symbols
 <BR>[Calls]<UL><LI><a href="#[63]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_llsr
 <LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_llsl
 </UL>
-<BR>[Called By]<UL><LI><a href="#[97]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_RCC_GetSysClockFreq
+<BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
+<LI><a href="#[97]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_RCC_GetSysClockFreq
 <LI><a href="#[d2]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
 <LI><a href="#[d3]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_fp_digits
 <LI><a href="#[65]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_ldivmod
@@ -609,7 +610,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[7f]"></a>FlowCtrl_Init</STRONG> (Thumb, 94 bytes, Stack size 40 bytes, flow_ctrl.o(.text.FlowCtrl_Init))
+<P><STRONG><a name="[7f]"></a>FlowCtrl_Init</STRONG> (Thumb, 146 bytes, Stack size 40 bytes, flow_ctrl.o(.text.FlowCtrl_Init))
 <BR><BR>[Stack]<UL><LI>Max Depth = 48<LI>Call Chain = FlowCtrl_Init &rArr; PID_Init
 </UL>
 <BR>[Calls]<UL><LI><a href="#[80]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_TIM_PWM_Start
@@ -623,7 +624,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[83]"></a>FlowCtrl_Update</STRONG> (Thumb, 196 bytes, Stack size 40 bytes, flow_ctrl.o(.text.FlowCtrl_Update))
+<P><STRONG><a name="[83]"></a>FlowCtrl_Update</STRONG> (Thumb, 242 bytes, Stack size 40 bytes, flow_ctrl.o(.text.FlowCtrl_Update))
 <BR><BR>[Stack]<UL><LI>Max Depth = 152<LI>Call Chain = FlowCtrl_Update &rArr; FRN06_ReadFlow_mslm &rArr; FRN06_ReadFlowRaw &rArr; HAL_I2C_Master_Receive &rArr; I2C_WaitOnRXNEFlagUntilTimeout
 </UL>
 <BR>[Calls]<UL><LI><a href="#[80]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_TIM_PWM_Start
@@ -1252,8 +1253,8 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> printfa.o(i.__0printf)
 </UL>
-<P><STRONG><a name="[5b]"></a>main</STRONG> (Thumb, 1196 bytes, Stack size 152 bytes, main.o(.text.main))
-<BR><BR>[Stack]<UL><LI>Max Depth = 768<LI>Call Chain = main &rArr; ModbusRTUSlave_Poll &rArr; process_frame &rArr; send_exception &rArr; HAL_UART_Transmit
+<P><STRONG><a name="[5b]"></a>main</STRONG> (Thumb, 1264 bytes, Stack size 160 bytes, main.o(.text.main))
+<BR><BR>[Stack]<UL><LI>Max Depth = 776<LI>Call Chain = main &rArr; ModbusRTUSlave_Poll &rArr; process_frame &rArr; send_exception &rArr; HAL_UART_Transmit
 </UL>
 <BR>[Calls]<UL><LI><a href="#[cb]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_f2d
 <LI><a href="#[c2]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;SystemClock_Config
@@ -1289,6 +1290,7 @@ Global Symbols
 <LI><a href="#[c9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ADS1256_GetLatestUv
 <LI><a href="#[c8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ADS1256_GetLatestRaw
 <LI><a href="#[ca]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__2printf
+<LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uldivmod
 <LI><a href="#[c5]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;puts
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> entry9a.o(.ARM.Collect$$$$0000000B)

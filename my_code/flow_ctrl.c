@@ -12,6 +12,10 @@
 #define FLOWCTRL_STARTUP_BOOST_THRESH_MSLM 50
 #endif
 
+#ifndef FLOWCTRL_REF_PWM_PERIOD
+#define FLOWCTRL_REF_PWM_PERIOD 199U
+#endif
+
 static PID_Controller s_pid;
 static int32_t s_target_mslm = 1000;
 static int32_t s_measured_mslm = 0;
@@ -22,6 +26,9 @@ static uint32_t s_boost_until_tick = 0;
 HAL_StatusTypeDef FlowCtrl_Init(void)
 {
   uint32_t period;
+  uint32_t scale_num;
+  uint32_t kp;
+  uint32_t ki;
 
   if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)
   {
@@ -29,7 +36,26 @@ HAL_StatusTypeDef FlowCtrl_Init(void)
   }
 
   period = (uint32_t)htim4.Init.Period;
-  PID_Init(&s_pid, 50, 1, 0, 0, (int32_t)period);
+
+  scale_num = (period + 1U);
+  if (scale_num < 1U)
+  {
+    scale_num = 1U;
+  }
+
+  kp = (uint32_t)((50U * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
+  if (kp < 1U)
+  {
+    kp = 1U;
+  }
+
+  ki = (uint32_t)((1U * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
+  if (ki < 1U)
+  {
+    ki = 1U;
+  }
+
+  PID_Init(&s_pid, (int32_t)kp, (int32_t)ki, 0, 0, (int32_t)period);
   PID_SetIntegralLimit(&s_pid, 0, (int32_t)period);
 
   s_pwm_compare = 0;

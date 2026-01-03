@@ -234,9 +234,15 @@ int main(void)
         uint32_t pwm = FlowCtrl_GetPwmCompare();
         int32_t raw = 0;
         (void)FRN06_ReadFlowRaw(&raw);
+        uint32_t arr = (uint32_t)htim4.Init.Period;
+        uint32_t duty_x1000 = 0;
+        if ((arr + 1U) != 0U)
+        {
+          duty_x1000 = (uint32_t)(((uint64_t)pwm * 1000ULL + (uint64_t)(arr + 1U) / 2ULL) / (uint64_t)(arr + 1U));
+        }
         int32_t abs_target = (target >= 0) ? target : -target;
         int32_t abs_meas = (meas >= 0) ? meas : -meas;
-        printf("FLOW raw=%ld, target=%c%ld.%03ld SLM, meas=%c%ld.%03ld SLM, pwm=%lu/%lu\r\n",
+        printf("FLOW raw=%ld, target=%c%ld.%03ld SLM, meas=%c%ld.%03ld SLM, pwm=%lu (ARR=%lu, duty=%lu.%01lu%%)\r\n",
                (long)raw,
                (target < 0) ? '-' : '+',
                (long)(abs_target / 1000L),
@@ -245,7 +251,9 @@ int main(void)
                (long)(abs_meas / 1000L),
                (long)(abs_meas % 1000L),
                (unsigned long)pwm,
-               (unsigned long)htim4.Init.Period);
+               (unsigned long)arr,
+               (unsigned long)(duty_x1000 / 10U),
+               (unsigned long)(duty_x1000 % 10U));
       }
     }
 
