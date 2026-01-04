@@ -5,7 +5,7 @@
 #include "tim.h"
 
 #ifndef FLOWCTRL_STARTUP_BOOST_MS
-#define FLOWCTRL_STARTUP_BOOST_MS 500U
+#define FLOWCTRL_STARTUP_BOOST_MS 0U
 #endif
 
 #ifndef FLOWCTRL_STARTUP_BOOST_THRESH_MSLM
@@ -23,12 +23,23 @@ static uint32_t s_pwm_compare = 0;
 static uint8_t s_inited = 0;
 static uint32_t s_boost_until_tick = 0;
 
+void FlowCtrl_Reset(void)
+{
+  s_boost_until_tick = 0U;
+  s_pwm_compare = 0U;
+  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
+  PID_Reset(&s_pid);
+}
+
 HAL_StatusTypeDef FlowCtrl_Init(void)
 {
   uint32_t period;
   uint32_t scale_num;
   uint32_t kp;
   uint32_t ki;
+
+  s_pwm_compare = 0U;
+  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
 
   if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)
   {
@@ -58,8 +69,7 @@ HAL_StatusTypeDef FlowCtrl_Init(void)
   PID_Init(&s_pid, (int32_t)kp, (int32_t)ki, 0, 0, (int32_t)period);
   PID_SetIntegralLimit(&s_pid, 0, (int32_t)period);
 
-  s_pwm_compare = 0;
-  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
+  FlowCtrl_Reset();
 
   s_inited = 1;
   return HAL_OK;

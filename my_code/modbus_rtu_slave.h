@@ -11,15 +11,15 @@ extern "C" {
 
 void ModbusRTUSlave_Init(UART_HandleTypeDef *huart, uint8_t slave_id);
 
-void ModbusRTUSlave_OnByte(uint8_t b);
-void ModbusRTUSlave_OnIdle(void);
-void ModbusRTUSlave_Poll(void);
+void ModbusRTUSlave_OnByteFromUart(UART_HandleTypeDef *huart, uint8_t b);
+void ModbusRTUSlave_OnIdleFromUart(UART_HandleTypeDef *huart);
+void ModbusRTUSlave_PollAll(void);
 
-void ModbusRTUSlave_SetGasType(uint16_t gas_type);
-void ModbusRTUSlave_SetConcentrationFloat(float conc);
+void ModbusRTUSlave_SetConcentrationU16(uint8_t ch, uint16_t conc);
+uint16_t ModbusRTUSlave_GetConcentrationU16(uint8_t ch);
 
-uint16_t ModbusRTUSlave_GetGasType(void);
-float ModbusRTUSlave_GetConcentrationFloat(void);
+void ModbusRTUSlave_SetPumpEnable(uint16_t en);
+uint16_t ModbusRTUSlave_GetPumpEnable(void);
 
 #ifdef __cplusplus
 }

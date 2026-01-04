@@ -52,11 +52,12 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t rx_buf;
+uint8_t uart1_rx_byte;
 uint8_t rs485_rx_byte;
 uint32_t frn06_test_last_tick = 0;
 uint32_t flow_ctrl_last_tick = 0;
 uint32_t ads_print_last_tick = 0;
+uint16_t pump_enable_last = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,12 +74,14 @@ void SystemClock_Config(void);
   */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if(huart->Instance == USART1) {
-        HAL_UART_Transmit(&huart1, &rx_buf, sizeof(rx_buf), 1000);
-        HAL_UART_Receive_IT(&huart1, &rx_buf, sizeof(rx_buf));
+    if(huart->Instance == USART1)
+    {
+        ModbusRTUSlave_OnByteFromUart(&huart1, uart1_rx_byte);
+        HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
     }
-    else if (huart->Instance == USART2) {
-        ModbusRTUSlave_OnByte(rs485_rx_byte);
+    else if (huart->Instance == USART2)
+    {
+        ModbusRTUSlave_OnByteFromUart(&huart2, rs485_rx_byte);
         HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
     }
 }
@@ -145,11 +148,12 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-  /* 开启 USART1 接收中断：用于回显测试（验证 RX 接线是否正确） */
-  HAL_UART_Receive_IT(&huart1, &rx_buf, sizeof(rx_buf));
-
+  ModbusRTUSlave_Init(&huart1, 1);
   ModbusRTUSlave_Init(&huart2, 1);
+
+  HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
   HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
   __HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 
   HAL_SPI_DeInit(&hspi1);
@@ -199,30 +203,67 @@ int main(void)
     ADS1256_Update();
 
     {
-      int32_t uv = ADS1256_GetLatestUv(0);
-      float v = (float)uv / 1000000.0f;
-      float conc;
-      if (v <= 0.4f)
+      float conc_f[4];
+      uint16_t conc_u16[4];
+      for (uint8_t ch = 0; ch < 4U; ch++)
       {
-        conc = 0.0f;
+        int32_t uv = ADS1256_GetLatestUv(ch);
+        float v = (float)uv / 1000000.0f;
+        float conc;
+        if (v <= 0.4f)
+        {
+          conc = 0.0f;
+        }
+        else if (v >= 2.0f)
+        {
+          conc = 10000.0f;
+        }
+        else
+        {
+          conc = (v - 0.4f) * (10000.0f / 1.6f);
+        }
+        conc_f[ch] = conc;
+
+        if (conc <= 0.0f)
+        {
+          conc_u16[ch] = 0U;
+        }
+        else if (conc >= 65535.0f)
+        {
+          conc_u16[ch] = 65535U;
+        }
+        else
+        {
+          conc_u16[ch] = (uint16_t)(conc + 0.5f);
+        }
+        ModbusRTUSlave_SetConcentrationU16(ch, conc_u16[ch]);
       }
-      else if (v >= 2.0f)
-      {
-        conc = 10000.0f;
-      }
-      else
-      {
-        conc = (v - 0.4f) * (10000.0f / 1.6f);
-      }
-      ModbusRTUSlave_SetConcentrationFloat(conc);
     }
 
-    ModbusRTUSlave_Poll();
+    ModbusRTUSlave_PollAll();
 
     if ((HAL_GetTick() - flow_ctrl_last_tick) >= 100U)
     {
       flow_ctrl_last_tick = HAL_GetTick();
-      FlowCtrl_Update();
+
+      {
+        uint16_t pump_en = ModbusRTUSlave_GetPumpEnable();
+
+        if (pump_en != pump_enable_last)
+        {
+          pump_enable_last = pump_en;
+          FlowCtrl_Reset();
+        }
+
+        if (pump_en != 0U)
+        {
+          FlowCtrl_Update();
+        }
+        else
+        {
+          __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+        }
+      }
     }
 
     if ((HAL_GetTick() - frn06_test_last_tick) >= 1000U)

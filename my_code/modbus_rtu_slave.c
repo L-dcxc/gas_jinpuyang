@@ -15,16 +15,37 @@
 #define MODBUS_EX_ILLEGAL_DATA_ADDR   0x02
 #define MODBUS_EX_ILLEGAL_DATA_VALUE  0x03
 
-static UART_HandleTypeDef *s_huart = NULL;
-static uint8_t s_slave_id = 1;
+typedef struct
+{
+  UART_HandleTypeDef *huart;
+  uint8_t slave_id;
+  volatile uint8_t rx_buf[MODBUS_RTU_MAX_FRAME];
+  volatile uint16_t rx_len;
+  volatile uint32_t last_rx_tick;
+  volatile uint8_t frame_ready;
+} ModbusPort;
 
-static volatile uint8_t s_rx_buf[MODBUS_RTU_MAX_FRAME];
-static volatile uint16_t s_rx_len = 0;
-static volatile uint32_t s_last_rx_tick = 0;
-static volatile uint8_t s_frame_ready = 0;
+static ModbusPort s_ports[2];
+static uint8_t s_port_count = 0;
 
-static uint16_t s_gas_type = 0;
-static float s_conc = 0.0f;
+static volatile uint16_t s_conc_u16[4] = {0, 0, 0, 0};
+static volatile uint16_t s_pump_en = 0;
+
+static ModbusPort *find_port(UART_HandleTypeDef *huart)
+{
+  if (huart == NULL)
+  {
+    return NULL;
+  }
+  for (uint8_t i = 0; i < s_port_count; i++)
+  {
+    if (s_ports[i].huart == huart)
+    {
+      return &s_ports[i];
+    }
+  }
+  return NULL;
+}
 
 static uint16_t crc16_modbus(const uint8_t *data, uint16_t len)
 {
@@ -59,37 +80,32 @@ static uint16_t u16_be_get(const uint8_t *p)
   return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
 }
 
-static void send_exception(uint8_t func, uint8_t ex)
+static void send_exception(ModbusPort *p, uint8_t func, uint8_t ex)
 {
   uint8_t out[5];
-  out[0] = s_slave_id;
+  if (p == NULL || p->huart == NULL)
+  {
+    return;
+  }
+  out[0] = p->slave_id;
   out[1] = (uint8_t)(func | 0x80);
   out[2] = ex;
   uint16_t crc = crc16_modbus(out, 3);
   out[3] = (uint8_t)(crc & 0xFF);
   out[4] = (uint8_t)((crc >> 8) & 0xFF);
-  (void)HAL_UART_Transmit(s_huart, out, sizeof(out), 100);
+  (void)HAL_UART_Transmit(p->huart, out, sizeof(out), 100);
 }
 
 static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
 {
-  if (addr_0based == 0)
+  if (addr_0based < 4U)
   {
-    *out = s_gas_type;
+    *out = (uint16_t)s_conc_u16[addr_0based];
     return 1;
   }
-  else if (addr_0based == 1 || addr_0based == 2)
+  if (addr_0based == 4U)
   {
-    union {
-      float f;
-      uint32_t u32;
-    } u;
-    u.f = s_conc;
-
-    uint16_t hi = (uint16_t)((u.u32 >> 16) & 0xFFFF);
-    uint16_t lo = (uint16_t)(u.u32 & 0xFFFF);
-
-    *out = (addr_0based == 1) ? hi : lo;
+    *out = (uint16_t)s_pump_en;
     return 1;
   }
   return 0;
@@ -97,28 +113,63 @@ static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
 
 static int write_holding_reg(uint16_t addr_0based, uint16_t val)
 {
-  if (addr_0based == 0)
+  if (addr_0based == 4U)
   {
-    s_gas_type = val;
-    return 1;
+    if (val == 0U || val == 1U)
+    {
+      s_pump_en = val;
+      return 1;
+    }
+    return 0;
   }
   return 0;
 }
 
-static void handle_read_holding_regs(const uint8_t *frame, uint16_t len)
+void ModbusRTUSlave_SetConcentrationU16(uint8_t ch, uint16_t conc)
+{
+  if (ch < 4U)
+  {
+    s_conc_u16[ch] = conc;
+  }
+}
+
+uint16_t ModbusRTUSlave_GetConcentrationU16(uint8_t ch)
+{
+  if (ch < 4U)
+  {
+    return (uint16_t)s_conc_u16[ch];
+  }
+  return 0;
+}
+
+void ModbusRTUSlave_SetPumpEnable(uint16_t en)
+{
+  s_pump_en = (en != 0U) ? 1U : 0U;
+}
+
+uint16_t ModbusRTUSlave_GetPumpEnable(void)
+{
+  return (uint16_t)s_pump_en;
+}
+
+static void handle_read_holding_regs(ModbusPort *p, const uint8_t *frame, uint16_t len)
 {
   (void)len;
+  if (p == NULL || p->huart == NULL)
+  {
+    return;
+  }
   uint16_t start = u16_be_get(&frame[2]);
   uint16_t qty = u16_be_get(&frame[4]);
 
   if (qty == 0 || qty > 125)
   {
-    send_exception(frame[1], MODBUS_EX_ILLEGAL_DATA_VALUE);
+    send_exception(p, frame[1], MODBUS_EX_ILLEGAL_DATA_VALUE);
     return;
   }
 
   uint8_t out[3 + 2 * 125 + 2];
-  out[0] = s_slave_id;
+  out[0] = p->slave_id;
   out[1] = MODBUS_FUNC_READ_HOLDING_REGS;
   out[2] = (uint8_t)(qty * 2);
 
@@ -127,7 +178,7 @@ static void handle_read_holding_regs(const uint8_t *frame, uint16_t len)
     uint16_t reg;
     if (!read_holding_reg((uint16_t)(start + i), &reg))
     {
-      send_exception(frame[1], MODBUS_EX_ILLEGAL_DATA_ADDR);
+      send_exception(p, frame[1], MODBUS_EX_ILLEGAL_DATA_ADDR);
       return;
     }
     u16_be_put(&out[3 + 2 * i], reg);
@@ -137,31 +188,47 @@ static void handle_read_holding_regs(const uint8_t *frame, uint16_t len)
   uint16_t crc = crc16_modbus(out, resp_len_wo_crc);
   out[resp_len_wo_crc + 0] = (uint8_t)(crc & 0xFF);
   out[resp_len_wo_crc + 1] = (uint8_t)((crc >> 8) & 0xFF);
-  (void)HAL_UART_Transmit(s_huart, out, (uint16_t)(resp_len_wo_crc + 2), 200);
+  (void)HAL_UART_Transmit(p->huart, out, (uint16_t)(resp_len_wo_crc + 2), 200);
 }
 
-static void handle_write_single_reg(const uint8_t *frame, uint16_t len)
+static void handle_write_single_reg(ModbusPort *p, const uint8_t *frame, uint16_t len)
 {
   (void)len;
+  if (p == NULL || p->huart == NULL)
+  {
+    return;
+  }
   uint16_t addr = u16_be_get(&frame[2]);
   uint16_t val = u16_be_get(&frame[4]);
 
   if (!write_holding_reg(addr, val))
   {
-    send_exception(frame[1], MODBUS_EX_ILLEGAL_DATA_ADDR);
+    if (addr == 4U)
+    {
+      send_exception(p, frame[1], MODBUS_EX_ILLEGAL_DATA_VALUE);
+    }
+    else
+    {
+      send_exception(p, frame[1], MODBUS_EX_ILLEGAL_DATA_ADDR);
+    }
     return;
   }
-  (void)HAL_UART_Transmit(s_huart, (uint8_t *)frame, 8, 200);
+  (void)HAL_UART_Transmit(p->huart, (uint8_t *)frame, 8, 200);
 }
 
-static void process_frame(const uint8_t *frame, uint16_t len)
+static void process_frame(ModbusPort *p, const uint8_t *frame, uint16_t len)
 {
   if (len < 4)
   {
     return;
   }
 
-  if (frame[0] != s_slave_id)
+  if (p == NULL)
+  {
+    return;
+  }
+
+  if (frame[0] != p->slave_id)
   {
     return;
   }
@@ -182,64 +249,88 @@ static void process_frame(const uint8_t *frame, uint16_t len)
   switch (func)
   {
     case MODBUS_FUNC_READ_HOLDING_REGS:
-      handle_read_holding_regs(frame, len);
+      handle_read_holding_regs(p, frame, len);
       break;
     case MODBUS_FUNC_WRITE_SINGLE_REG:
-      handle_write_single_reg(frame, len);
+      handle_write_single_reg(p, frame, len);
       break;
     default:
-      send_exception(func, MODBUS_EX_ILLEGAL_FUNCTION);
+      send_exception(p, func, MODBUS_EX_ILLEGAL_FUNCTION);
       break;
   }
 }
 
 void ModbusRTUSlave_Init(UART_HandleTypeDef *huart, uint8_t slave_id)
 {
-  s_huart = huart;
-  s_slave_id = (slave_id == 0) ? 1 : slave_id;
-  s_rx_len = 0;
-  s_last_rx_tick = HAL_GetTick();
-  s_frame_ready = 0;
+  ModbusPort *p = find_port(huart);
+  if (p == NULL)
+  {
+    if (s_port_count >= (uint8_t)(sizeof(s_ports) / sizeof(s_ports[0])))
+    {
+      return;
+    }
+    p = &s_ports[s_port_count++];
+    p->huart = huart;
+    p->rx_len = 0;
+    p->last_rx_tick = HAL_GetTick();
+    p->frame_ready = 0;
+  }
+  p->slave_id = (slave_id == 0U) ? 1U : slave_id;
 }
 
-void ModbusRTUSlave_OnByte(uint8_t b)
+void ModbusRTUSlave_OnByteFromUart(UART_HandleTypeDef *huart, uint8_t b)
 {
-  s_last_rx_tick = HAL_GetTick();
+  ModbusPort *p = find_port(huart);
+  if (p == NULL)
+  {
+    return;
+  }
+  p->last_rx_tick = HAL_GetTick();
 
-  if (s_frame_ready)
+  if (p->frame_ready)
   {
     return;
   }
 
-  if (s_rx_len < MODBUS_RTU_MAX_FRAME)
+  if (p->rx_len < MODBUS_RTU_MAX_FRAME)
   {
-    s_rx_buf[s_rx_len++] = b;
+    p->rx_buf[p->rx_len++] = b;
   }
   else
   {
-    s_rx_len = 0;
+    p->rx_len = 0;
   }
 }
 
-void ModbusRTUSlave_OnIdle(void)
+void ModbusRTUSlave_OnIdleFromUart(UART_HandleTypeDef *huart)
 {
-  if (s_rx_len == 0)
+  ModbusPort *p = find_port(huart);
+  if (p == NULL)
   {
     return;
   }
-  s_frame_ready = 1;
+  if (p->rx_len == 0)
+  {
+    return;
+  }
+  p->frame_ready = 1;
 }
 
-void ModbusRTUSlave_Poll(void)
+static void poll_one(ModbusPort *p)
 {
-  if (!s_frame_ready)
+  if (p == NULL)
   {
-    if (s_rx_len > 0)
+    return;
+  }
+
+  if (!p->frame_ready)
+  {
+    if (p->rx_len > 0)
     {
       uint32_t now = HAL_GetTick();
-      if ((now - s_last_rx_tick) >= MODBUS_RTU_RX_SILENT_TIMEOUT_MS)
+      if ((now - p->last_rx_tick) >= MODBUS_RTU_RX_SILENT_TIMEOUT_MS)
       {
-        s_frame_ready = 1;
+        p->frame_ready = 1;
       }
     }
     else
@@ -248,7 +339,7 @@ void ModbusRTUSlave_Poll(void)
     }
   }
 
-  uint16_t len = s_rx_len;
+  uint16_t len = p->rx_len;
   uint8_t frame[MODBUS_RTU_MAX_FRAME];
   if (len > MODBUS_RTU_MAX_FRAME)
   {
@@ -257,41 +348,29 @@ void ModbusRTUSlave_Poll(void)
 
   for (uint16_t i = 0; i < len; i++)
   {
-    frame[i] = s_rx_buf[i];
+    frame[i] = p->rx_buf[i];
   }
 
-  s_rx_len = 0;
-  s_frame_ready = 0;
+  p->rx_len = 0;
+  p->frame_ready = 0;
 
   if (len >= 16U && ((len & 0x0007U) == 0U))
   {
     for (uint16_t off = 0; (uint16_t)(off + 8U) <= len; off = (uint16_t)(off + 8U))
     {
-      process_frame(&frame[off], 8U);
+      process_frame(p, &frame[off], 8U);
     }
   }
   else
   {
-    process_frame(frame, len);
+    process_frame(p, frame, len);
   }
 }
 
-void ModbusRTUSlave_SetGasType(uint16_t gas_type)
+void ModbusRTUSlave_PollAll(void)
 {
-  s_gas_type = gas_type;
-}
-
-void ModbusRTUSlave_SetConcentrationFloat(float conc)
-{
-  s_conc = conc;
-}
-
-uint16_t ModbusRTUSlave_GetGasType(void)
-{
-  return s_gas_type;
-}
-
-float ModbusRTUSlave_GetConcentrationFloat(void)
-{
-  return s_conc;
+  for (uint8_t i = 0; i < s_port_count; i++)
+  {
+    poll_one(&s_ports[i]);
+  }
 }
