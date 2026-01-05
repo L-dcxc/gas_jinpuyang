@@ -21,21 +21,56 @@
 #endif
 
 #ifndef FLOWCTRL_DEFAULT_KI_REF
-#define FLOWCTRL_DEFAULT_KI_REF 4U
+#define FLOWCTRL_DEFAULT_KI_REF 10U
 #endif
+
+#ifndef FLOWCTRL_HOLD_STABLE_N
+#define FLOWCTRL_HOLD_STABLE_N 5U
+#endif
+
+#ifndef FLOWCTRL_HOLD_STABLE_ERR_MSLM
+#define FLOWCTRL_HOLD_STABLE_ERR_MSLM 10L
+#endif
+
+#ifndef FLOWCTRL_HOLD_REENTER_ERR_MSLM
+#define FLOWCTRL_HOLD_REENTER_ERR_MSLM 60L
+#endif
+
+typedef enum
+{
+  FLOWCTRL_MODE_PID = 0,
+  FLOWCTRL_MODE_HOLD = 1
+} FlowCtrl_Mode;
 
 static PID_Controller s_pid;
 static int32_t s_target_mslm = 1000;
 static int32_t s_measured_mslm = 0;
+static int32_t s_measured_inst_mslm = 0;
+static uint8_t s_measured_filt_inited = 0;
 static uint32_t s_pwm_compare = 0;
 static uint8_t s_inited = 0;
 static uint32_t s_boost_until_tick = 0;
+
+static FlowCtrl_Mode s_mode = FLOWCTRL_MODE_PID;
+static uint32_t s_hold_pwm_compare = 0U;
+static uint8_t s_stable_cnt = 0U;
+
+static int32_t abs_i32(int32_t x)
+{
+  return (x >= 0) ? x : -x;
+}
 
 void FlowCtrl_Reset(void)
 {
   s_boost_until_tick = 0U;
   s_pwm_compare = 0U;
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
+  s_measured_mslm = 0;
+  s_measured_inst_mslm = 0;
+  s_measured_filt_inited = 0;
+  s_mode = FLOWCTRL_MODE_PID;
+  s_hold_pwm_compare = 0U;
+  s_stable_cnt = 0U;
   PID_Reset(&s_pid);
 }
 
@@ -50,7 +85,16 @@ void FlowCtrl_Sample(void)
 
   if (FRN06_ReadFlow_mslm(&flow) == HAL_OK)
   {
-    s_measured_mslm = flow;
+    s_measured_inst_mslm = flow;
+    if (s_measured_filt_inited == 0U)
+    {
+      s_measured_mslm = flow;
+      s_measured_filt_inited = 1U;
+    }
+    else
+    {
+      s_measured_mslm = s_measured_mslm + ((flow - s_measured_mslm) / 5);
+    }
   }
 }
 
@@ -127,6 +171,24 @@ void FlowCtrl_Update(void)
   FlowCtrl_Sample();
 
   now = HAL_GetTick();
+
+  if (s_mode == FLOWCTRL_MODE_HOLD)
+  {
+    int32_t err = s_target_mslm - s_measured_mslm;
+    if (abs_i32(err) >= (int32_t)FLOWCTRL_HOLD_REENTER_ERR_MSLM)
+    {
+      s_mode = FLOWCTRL_MODE_PID;
+      s_stable_cnt = 0U;
+      PID_Reset(&s_pid);
+    }
+    else
+    {
+      s_pwm_compare = s_hold_pwm_compare;
+      __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
+      return;
+    }
+  }
+
   if (s_target_mslm > 0 && s_measured_mslm < (int32_t)FLOWCTRL_STARTUP_BOOST_THRESH_MSLM)
   {
     if (s_boost_until_tick == 0U)
@@ -154,6 +216,28 @@ void FlowCtrl_Update(void)
     }
     s_pwm_compare = (uint32_t)out;
     __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
+  }
+
+  {
+    int32_t err = s_target_mslm - s_measured_mslm;
+    if (abs_i32(err) <= (int32_t)FLOWCTRL_HOLD_STABLE_ERR_MSLM)
+    {
+      if (s_stable_cnt < 255U)
+      {
+        s_stable_cnt++;
+      }
+    }
+    else
+    {
+      s_stable_cnt = 0U;
+    }
+
+    if (s_stable_cnt >= (uint8_t)FLOWCTRL_HOLD_STABLE_N)
+    {
+      s_mode = FLOWCTRL_MODE_HOLD;
+      s_hold_pwm_compare = s_pwm_compare;
+      s_stable_cnt = 0U;
+    }
   }
 }
 

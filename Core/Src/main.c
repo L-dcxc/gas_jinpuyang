@@ -311,8 +311,10 @@ int main(void)
       printf("FRN06 read params failed\r\n");
     }
   }
+
   (void)FlowCtrl_Init();
-  FlowCtrl_SetTarget_mslm(400);
+  FlowCtrl_SetTarget_mslm(500);
+
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 #endif
@@ -416,10 +418,9 @@ int main(void)
 #endif
 
 #if !MODBUS_ONLY_TEST
-    if ((HAL_GetTick() - flow_ctrl_last_tick) >= 100U)
+    if ((HAL_GetTick() - flow_ctrl_last_tick) >= 50U)
     {
       flow_ctrl_last_tick = HAL_GetTick();
-
       {
         uint16_t pump_en = ModbusRTUSlave_GetPumpEnable();
 
@@ -447,10 +448,11 @@ int main(void)
     {
       frn06_test_last_tick = HAL_GetTick();
       {
-        int32_t target = FlowCtrl_GetTarget_mslm();
-        int32_t meas = FlowCtrl_GetMeasured_mslm();
+        int32_t meas = 0;
+        int32_t filt = FlowCtrl_GetMeasured_mslm();
         uint32_t pwm = FlowCtrl_GetPwmCompare();
         int32_t raw = 0;
+        (void)FRN06_ReadFlow_mslm(&meas);
         (void)FRN06_ReadFlowRaw(&raw);
 
         uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim4);
@@ -463,12 +465,16 @@ int main(void)
 
         int32_t abs_meas = (meas >= 0) ? meas : -meas;
 
-        printf("FLOW target=%ld meas=%c%ld.%03ld raw=%ld pwm=%lu/%lu (duty=%lu.%01lu%%)\r\n",
-               (long)target,
+        int32_t abs_filt = (filt >= 0) ? filt : -filt;
+
+        printf("FLOW raw=%ld inst=%c%ld.%03ld filt=%c%ld.%03ld pwm=%lu/%lu (duty=%lu.%01lu%%)\r\n",
+               (long)raw,
                (meas < 0) ? '-' : '+',
                (long)(abs_meas / 1000L),
                (long)(abs_meas % 1000L),
-               (long)raw,
+               (filt < 0) ? '-' : '+',
+               (long)(abs_filt / 1000L),
+               (long)(abs_filt % 1000L),
                (unsigned long)pwm,
                (unsigned long)arr,
                (unsigned long)(duty_x1000 / 10U),
@@ -508,13 +514,13 @@ int main(void)
           }
         }
 
-        // printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
-        // printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
-        //        (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
-        // printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
-        //        conc[0], conc[1], conc[2], conc[3]);
-        // printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
-        //        v[0], v[1], v[2], v[3]);
+        printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
+        printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
+               (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
+        printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
+               conc[0], conc[1], conc[2], conc[3]);
+        printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
+               v[0], v[1], v[2], v[3]);
       }
     }
 #endif

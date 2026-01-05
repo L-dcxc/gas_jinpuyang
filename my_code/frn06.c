@@ -16,6 +16,9 @@
 #define FRN06_ZERO_DEADBAND_MSLM 10L
 #endif
 
+static int32_t s_frn06_offset = FRN06_OFFSET_DEFAULT;
+static int32_t s_frn06_scale = FRN06_SCALE_DEFAULT;
+
 static uint8_t frn06_crc8_poly131(const uint8_t *data, uint32_t len)
 {
   uint8_t crc = 0x00;
@@ -80,6 +83,12 @@ HAL_StatusTypeDef FRN06_ReadParams(int32_t *offset, int32_t *scale)
     uint16_t scale_u16 = (uint16_t)(((uint16_t)resp[10] << 8) | (uint16_t)resp[11]);
     *offset = (int32_t)off_u16;
     *scale = (int32_t)scale_u16;
+    s_frn06_offset = *offset;
+    s_frn06_scale = *scale;
+    if (s_frn06_scale == 0)
+    {
+      s_frn06_scale = FRN06_SCALE_DEFAULT;
+    }
   }
 
   return HAL_OK;
@@ -100,13 +109,13 @@ HAL_StatusTypeDef FRN06_ReadFlowRaw(int32_t *raw)
   cmd[0] = (uint8_t)((FRN06_CMD_FLOW >> 8) & 0xFF);
   cmd[1] = (uint8_t)(FRN06_CMD_FLOW & 0xFF);
 
-  st = HAL_I2C_Master_Transmit(&hi2c1, FRN06_I2C_ADDR_W, cmd, sizeof(cmd), 100);
+  st = HAL_I2C_Master_Transmit(&hi2c1, FRN06_I2C_ADDR_W, cmd, sizeof(cmd), 10);
   if (st != HAL_OK)
   {
     return st;
   }
 
-  st = HAL_I2C_Master_Receive(&hi2c1, FRN06_I2C_ADDR_W, resp, sizeof(resp), 100);
+  st = HAL_I2C_Master_Receive(&hi2c1, FRN06_I2C_ADDR_W, resp, sizeof(resp), 10);
   if (st != HAL_OK)
   {
     return st;
@@ -136,8 +145,8 @@ HAL_StatusTypeDef FRN06_ReadFlow_mslm(int32_t *flow_mslm)
   }
 
   {
-    int64_t num = (int64_t)(raw - FRN06_OFFSET_DEFAULT) * 1000LL;
-    int64_t den = (int64_t)FRN06_SCALE_DEFAULT;
+    int64_t num = (int64_t)(raw - s_frn06_offset) * 1000LL;
+    int64_t den = (int64_t)s_frn06_scale;
 
     if (num >= 0)
     {
