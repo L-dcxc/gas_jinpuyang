@@ -5,7 +5,7 @@
 #endif
 
 #ifndef MODBUS_RTU_RX_SILENT_TIMEOUT_MS
-#define MODBUS_RTU_RX_SILENT_TIMEOUT_MS 10U
+#define MODBUS_RTU_RX_SILENT_TIMEOUT_MS 30U
 #endif
 
 #define MODBUS_FUNC_READ_HOLDING_REGS 0x03
@@ -30,6 +30,9 @@ static uint8_t s_port_count = 0;
 
 static volatile uint16_t s_conc_u16[4] = {0, 0, 0, 0};
 static volatile uint16_t s_pump_en = 0;
+
+volatile uint32_t g_modbus_rx_ok_frames = 0;
+volatile uint32_t g_modbus_rx_bad_crc_frames = 0;
 
 static ModbusPort *find_port(UART_HandleTypeDef *huart)
 {
@@ -242,8 +245,11 @@ static void process_frame(ModbusPort *p, const uint8_t *frame, uint16_t len)
   uint16_t crc_calc = crc16_modbus(frame, (uint16_t)(len - 2));
   if (crc_rx != crc_calc)
   {
+    g_modbus_rx_bad_crc_frames++;
     return;
   }
+
+  g_modbus_rx_ok_frames++;
 
   uint8_t func = frame[1];
   switch (func)
@@ -325,12 +331,16 @@ static void poll_one(ModbusPort *p)
 
   if (!p->frame_ready)
   {
-    if (p->rx_len > 0)
+    if (p->rx_len >= 8U)
     {
       uint32_t now = HAL_GetTick();
       if ((now - p->last_rx_tick) >= MODBUS_RTU_RX_SILENT_TIMEOUT_MS)
       {
         p->frame_ready = 1;
+      }
+      else
+      {
+        return;
       }
     }
     else
@@ -351,19 +361,35 @@ static void poll_one(ModbusPort *p)
     frame[i] = p->rx_buf[i];
   }
 
+  if (len < 8U)
+  {
+    p->frame_ready = 0;
+    return;
+  }
+
   p->rx_len = 0;
   p->frame_ready = 0;
 
-  if (len >= 16U && ((len & 0x0007U) == 0U))
+  for (uint16_t off = 0; (uint16_t)(off + 8U) <= len;)
   {
-    for (uint16_t off = 0; (uint16_t)(off + 8U) <= len; off = (uint16_t)(off + 8U))
+    uint8_t addr = frame[off + 0U];
+    uint8_t func = frame[off + 1U];
+    if (addr == p->slave_id && (func == MODBUS_FUNC_READ_HOLDING_REGS || func == MODBUS_FUNC_WRITE_SINGLE_REG))
     {
-      process_frame(p, &frame[off], 8U);
+      uint16_t crc_rx = (uint16_t)(((uint16_t)frame[off + 7U] << 8) | frame[off + 6U]);
+      uint16_t crc_calc = crc16_modbus(&frame[off], 6U);
+      if (crc_rx == crc_calc)
+      {
+        process_frame(p, &frame[off], 8U);
+        off = (uint16_t)(off + 8U);
+        continue;
+      }
+      else
+      {
+        g_modbus_rx_bad_crc_frames++;
+      }
     }
-  }
-  else
-  {
-    process_frame(p, frame, len);
+    off++;
   }
 }
 

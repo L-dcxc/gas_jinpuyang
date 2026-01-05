@@ -18,6 +18,7 @@ void ADS1256_SelfTest(void);
 
 extern volatile int32_t g_ads1256_latest_raw[ADS1256_CH_COUNT];
 extern volatile int32_t g_ads1256_latest_uv[ADS1256_CH_COUNT];
+extern volatile uint8_t g_ads1256_drdy_flag;
 
 void ADS1256_Update(void);
 int32_t ADS1256_GetLatestRaw(uint8_t ch);

@@ -10,6 +10,7 @@ static uint8_t ads1256_spi_txrx(uint8_t data);
 static void ads1256_short_delay(void);
 static void ads1256_cmd(uint8_t cmd);
 static void ads1256_write_reg(uint8_t reg, uint8_t value);
+static void ads1256_write_reg_fast(uint8_t reg, uint8_t value);
 static uint8_t ads1256_read_reg(uint8_t reg);
 static int32_t ads1256_sign_extend_24(uint32_t x);
 static int ads1256_wait_drdy_low(uint32_t timeout_ms);
@@ -55,6 +56,7 @@ static int ads1256_wait_drdy_low(uint32_t timeout_ms);
 
 volatile int32_t g_ads1256_latest_raw[ADS1256_USED_CHANNELS] = {0};
 volatile int32_t g_ads1256_latest_uv[ADS1256_USED_CHANNELS] = {0};
+volatile uint8_t g_ads1256_drdy_flag = 0;
 
 static int32_t ads1256_raw_to_uv(int32_t raw)
 {
@@ -87,6 +89,29 @@ static int32_t ads1256_read_raw_current_mux(void)
     return (int32_t)0x80000000;
   }
 
+  (void)ads1256_spi_txrx(ADS1256_CMD_RDATA);
+  ads1256_short_delay();
+
+  b0 = ads1256_spi_txrx(0xFF);
+  b1 = ads1256_spi_txrx(0xFF);
+  b2 = ads1256_spi_txrx(0xFF);
+  ads1256_cs_high();
+
+  raw24 = ((uint32_t)b0 << 16) | ((uint32_t)b1 << 8) | (uint32_t)b2;
+  return ads1256_sign_extend_24(raw24);
+}
+
+static int32_t ads1256_read_raw_when_ready(void)
+{
+  uint8_t b0, b1, b2;
+  uint32_t raw24;
+
+  if (HAL_GPIO_ReadPin(ADS_DRDY_GPIO_Port, ADS_DRDY_Pin) == GPIO_PIN_SET)
+  {
+    return (int32_t)0x80000000;
+  }
+
+  ads1256_cs_low();
   (void)ads1256_spi_txrx(ADS1256_CMD_RDATA);
   ads1256_short_delay();
 
@@ -135,6 +160,10 @@ void ADS1256_Update(void)
 {
   static uint8_t inited = 0;
   static uint8_t next_ch = 0;
+  static uint8_t phase = 0;
+  static uint32_t discard_left = 0;
+  static uint32_t avg_left = 0;
+  static int64_t avg_sum = 0;
   static int32_t movavg_buf[ADS1256_USED_CHANNELS][ADS1256_MOVAVG_WIN] = {0};
   static int64_t movavg_sum[ADS1256_USED_CHANNELS] = {0};
   static uint8_t movavg_idx[ADS1256_USED_CHANNELS] = {0};
@@ -144,22 +173,64 @@ void ADS1256_Update(void)
   {
     ADS1256_Init();
     inited = 1;
+    next_ch = 0;
+    phase = 0;
+    discard_left = 0;
+    avg_left = 0;
+    avg_sum = 0;
   }
+
+  if (phase == 0)
+  {
+    uint8_t ch = next_ch;
+    uint8_t mux = (uint8_t)(((ch & 0x07) << 4) | ADS1256_MUXN_AINCOM);
+    ads1256_write_reg_fast(ADS1256_REG_MUX, mux);
+
+    discard_left = (uint32_t)ADS1256_DISCARD_SAMPLES;
+    avg_left = (uint32_t)ADS1256_AVG_SAMPLES;
+    avg_sum = 0;
+
+    ads1256_cs_low();
+    (void)ads1256_spi_txrx(ADS1256_CMD_SYNC);
+    (void)ads1256_spi_txrx(ADS1256_CMD_WAKEUP);
+    ads1256_cs_high();
+
+    phase = 1;
+    return;
+  }
+
+  if (g_ads1256_drdy_flag == 0U)
+  {
+    return;
+  }
+  g_ads1256_drdy_flag = 0U;
 
   {
     uint8_t ch = next_ch;
-    next_ch++;
-    if (next_ch >= ADS1256_USED_CHANNELS)
-    {
-      next_ch = 0;
-    }
-
-    int32_t raw = ads1256_read_raw_ainx_aincom_filtered(ch);
+    int32_t raw = ads1256_read_raw_when_ready();
     if (raw == (int32_t)0x80000000)
     {
       g_ads1256_latest_raw[ch] = (int32_t)0x80000000;
       g_ads1256_latest_uv[ch] = (int32_t)0x80000000;
+      phase = 0;
       return;
+    }
+
+    if (discard_left > 0U)
+    {
+      discard_left--;
+      return;
+    }
+
+    if (avg_left > 0U)
+    {
+      avg_sum += (int64_t)raw;
+      avg_left--;
+      if (avg_left > 0U)
+      {
+        return;
+      }
+      raw = (int32_t)(avg_sum / (int64_t)ADS1256_AVG_SAMPLES);
     }
 
     {
@@ -185,6 +256,13 @@ void ADS1256_Update(void)
 
     g_ads1256_latest_raw[ch] = raw;
     g_ads1256_latest_uv[ch] = ads1256_raw_to_uv(raw);
+
+    next_ch++;
+    if (next_ch >= ADS1256_USED_CHANNELS)
+    {
+      next_ch = 0;
+    }
+    phase = 0;
   }
 }
 
@@ -250,6 +328,16 @@ static void ads1256_write_reg(uint8_t reg, uint8_t value)
 
   /* t11: delay after WREG (conservative) */
   HAL_Delay(2);
+}
+
+static void ads1256_write_reg_fast(uint8_t reg, uint8_t value)
+{
+  ads1256_cs_low();
+  (void)ads1256_spi_txrx((uint8_t)(ADS1256_CMD_WREG | (reg & 0x0F)));
+  (void)ads1256_spi_txrx(0x00); /* write 1 register */
+  (void)ads1256_spi_txrx(value);
+  ads1256_short_delay();
+  ads1256_cs_high();
 }
 
 static uint8_t ads1256_read_reg(uint8_t reg)

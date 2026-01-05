@@ -42,6 +42,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define UART1_RX_REPLY_OK 0
+#define DEBUG_UART_TX_TIMEOUT_MS 5U
+
+#define MODBUS_ONLY_TEST 0
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,10 +59,14 @@
 /* USER CODE BEGIN PV */
 uint8_t uart1_rx_byte;
 uint8_t rs485_rx_byte;
+uint8_t uart1_rx_seen;
+uint32_t uart1_rx_cnt;
+uint32_t uart2_rx_cnt;
 uint32_t frn06_test_last_tick = 0;
 uint32_t flow_ctrl_last_tick = 0;
 uint32_t ads_print_last_tick = 0;
 uint16_t pump_enable_last = 0;
+uint32_t modbus_dbg_last_tick = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,14 +85,50 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if(huart->Instance == USART1)
     {
+        uart1_rx_seen = 1U;
+        uart1_rx_cnt++;
         ModbusRTUSlave_OnByteFromUart(&huart1, uart1_rx_byte);
         HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
     }
     else if (huart->Instance == USART2)
     {
+        uart2_rx_cnt++;
         ModbusRTUSlave_OnByteFromUart(&huart2, rs485_rx_byte);
         HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
     }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  if (huart == NULL)
+  {
+    return;
+  }
+
+  if (huart->Instance == USART1)
+  {
+    __HAL_UART_CLEAR_OREFLAG(&huart1);
+    __HAL_UART_CLEAR_FEFLAG(&huart1);
+    __HAL_UART_CLEAR_NEFLAG(&huart1);
+    __HAL_UART_CLEAR_PEFLAG(&huart1);
+    (void)HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
+  }
+  else if (huart->Instance == USART2)
+  {
+    __HAL_UART_CLEAR_OREFLAG(&huart2);
+    __HAL_UART_CLEAR_FEFLAG(&huart2);
+    __HAL_UART_CLEAR_NEFLAG(&huart2);
+    __HAL_UART_CLEAR_PEFLAG(&huart2);
+    (void)HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
+  }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == ADS_DRDY_Pin)
+  {
+    g_ads1256_drdy_flag = 1U;
+  }
 }
 
 /**
@@ -93,7 +138,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 int fputc(int ch, FILE *f)
 {
   (void)f;
-  HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, 0xFFFF);
+  (void)HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, DEBUG_UART_TX_TIMEOUT_MS);
   return ch;
 }
 
@@ -104,7 +149,7 @@ int fputc(int ch, FILE *f)
 int _write(int file, char *ptr, int len)
 {
   (void)file;
-  HAL_UART_Transmit(&huart3, (uint8_t *)ptr, (uint16_t)len, 0xFFFF);
+  (void)HAL_UART_Transmit(&huart3, (uint8_t *)ptr, (uint16_t)len, DEBUG_UART_TX_TIMEOUT_MS);
   return len;
 }
 #endif
@@ -153,8 +198,32 @@ int main(void)
 
   HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
   HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
-  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
-  __HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
+
+  HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(USART2_IRQn, 1, 0);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(USART3_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
+  HAL_NVIC_EnableIRQ(USART2_IRQn);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
+
+#if MODBUS_ONLY_TEST
+  HAL_NVIC_DisableIRQ(EXTI0_IRQn);
+
+  ModbusRTUSlave_SetPumpEnable(0U);
+  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+  (void)HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_1);
+  {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_RESET);
+  }
+#endif
 
   HAL_SPI_DeInit(&hspi1);
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
@@ -176,11 +245,6 @@ int main(void)
   {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    GPIO_InitStruct.Pin = ADS_DRDY_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(ADS_DRDY_GPIO_Port, &GPIO_InitStruct);
-
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -189,6 +253,7 @@ int main(void)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
   }
 
+#if !MODBUS_ONLY_TEST
   FRN06_Init();
   {
     int32_t off = 0;
@@ -203,15 +268,17 @@ int main(void)
     }
   }
   (void)FlowCtrl_Init();
-  FlowCtrl_SetTarget_mslm(800);
+  FlowCtrl_SetTarget_mslm(400);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+#if !MODBUS_ONLY_TEST
     ADS1256_Update();
 
     {
@@ -251,9 +318,32 @@ int main(void)
         ModbusRTUSlave_SetConcentrationU16(ch, conc_u16[ch]);
       }
     }
+#endif
 
     ModbusRTUSlave_PollAll();
 
+#if MODBUS_ONLY_TEST
+    if ((HAL_GetTick() - modbus_dbg_last_tick) >= 1000U)
+    {
+      modbus_dbg_last_tick = HAL_GetTick();
+      printf("MB rx1=%lu rx2=%lu ok=%lu bad=%lu\r\n",
+             (unsigned long)uart1_rx_cnt,
+             (unsigned long)uart2_rx_cnt,
+             (unsigned long)g_modbus_rx_ok_frames,
+             (unsigned long)g_modbus_rx_bad_crc_frames);
+    }
+#endif
+
+#if UART1_RX_REPLY_OK
+    if (uart1_rx_seen != 0U)
+    {
+      static const uint8_t ok_msg[] = "ok\r\n";
+      uart1_rx_seen = 0U;
+      (void)HAL_UART_Transmit(&huart1, (uint8_t *)ok_msg, (uint16_t)(sizeof(ok_msg) - 1U), 10);
+    }
+#endif
+
+#if !MODBUS_ONLY_TEST
     if ((HAL_GetTick() - flow_ctrl_last_tick) >= 100U)
     {
       flow_ctrl_last_tick = HAL_GetTick();
@@ -278,7 +368,9 @@ int main(void)
         }
       }
     }
+#endif
 
+#if !MODBUS_ONLY_TEST
     if ((HAL_GetTick() - frn06_test_last_tick) >= 1000U)
     {
       frn06_test_last_tick = HAL_GetTick();
@@ -288,29 +380,32 @@ int main(void)
         uint32_t pwm = FlowCtrl_GetPwmCompare();
         int32_t raw = 0;
         (void)FRN06_ReadFlowRaw(&raw);
-        uint32_t arr = (uint32_t)htim4.Init.Period;
+
+        uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim4);
+        uint32_t period = arr + 1U;
         uint32_t duty_x1000 = 0;
-        if ((arr + 1U) != 0U)
+        if (period > 0U)
         {
-          duty_x1000 = (uint32_t)(((uint64_t)pwm * 1000ULL + (uint64_t)(arr + 1U) / 2ULL) / (uint64_t)(arr + 1U));
+          duty_x1000 = (uint32_t)((pwm * 1000U) / period);
         }
-        int32_t abs_target = (target >= 0) ? target : -target;
+
         int32_t abs_meas = (meas >= 0) ? meas : -meas;
-        printf("FLOW raw=%ld, target=%c%ld.%03ld SLM, meas=%c%ld.%03ld SLM, pwm=%lu (ARR=%lu, duty=%lu.%01lu%%)\r\n",
-               (long)raw,
-               (target < 0) ? '-' : '+',
-               (long)(abs_target / 1000L),
-               (long)(abs_target % 1000L),
+
+        printf("FLOW target=%ld meas=%c%ld.%03ld raw=%ld pwm=%lu/%lu (duty=%lu.%01lu%%)\r\n",
+               (long)target,
                (meas < 0) ? '-' : '+',
                (long)(abs_meas / 1000L),
                (long)(abs_meas % 1000L),
+               (long)raw,
                (unsigned long)pwm,
                (unsigned long)arr,
                (unsigned long)(duty_x1000 / 10U),
                (unsigned long)(duty_x1000 % 10U));
       }
     }
+#endif
 
+#if !MODBUS_ONLY_TEST
     if ((HAL_GetTick() - ads_print_last_tick) >= 200U)
     {
       ads_print_last_tick = HAL_GetTick();
@@ -350,6 +445,7 @@ int main(void)
                v[0], v[1], v[2], v[3]);
       }
     }
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

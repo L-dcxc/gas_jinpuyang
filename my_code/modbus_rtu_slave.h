@@ -21,6 +21,9 @@ uint16_t ModbusRTUSlave_GetConcentrationU16(uint8_t ch);
 void ModbusRTUSlave_SetPumpEnable(uint16_t en);
 uint16_t ModbusRTUSlave_GetPumpEnable(void);
 
+extern volatile uint32_t g_modbus_rx_ok_frames;
+extern volatile uint32_t g_modbus_rx_bad_crc_frames;
+
 #ifdef __cplusplus
 }
 #endif
