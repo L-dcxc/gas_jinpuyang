@@ -47,6 +47,12 @@
 
 #define MODBUS_ONLY_TEST 0
 
+#define LEAK_ADC_VREF_MV 3300U
+#define LEAK_ADC_FULL_SCALE 4095U
+#define LEAK_VOLT_MIN_MV 400U
+#define LEAK_VOLT_MAX_MV 2000U
+#define LEAK_CONC_MAX_U16 10000U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,6 +73,12 @@ uint32_t flow_ctrl_last_tick = 0;
 uint32_t ads_print_last_tick = 0;
 uint16_t pump_enable_last = 0;
 uint32_t modbus_dbg_last_tick = 0;
+
+uint32_t leak_adc_last_tick = 0;
+uint32_t leak_print_last_tick = 0;
+uint16_t leak_adc_raw = 0;
+uint16_t leak_mv = 0;
+uint16_t leak_conc_u16 = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,6 +140,38 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if (GPIO_Pin == ADS_DRDY_Pin)
   {
     g_ads1256_drdy_flag = 1U;
+  }
+}
+
+static uint16_t LeakAdc_To_mV(uint16_t adc)
+{
+  uint32_t mv = ((uint32_t)adc * (uint32_t)LEAK_ADC_VREF_MV + (LEAK_ADC_FULL_SCALE / 2U)) / (uint32_t)LEAK_ADC_FULL_SCALE;
+  if (mv > 65535U)
+  {
+    mv = 65535U;
+  }
+  return (uint16_t)mv;
+}
+
+static uint16_t Leak_mV_To_ConcU16(uint16_t mv)
+{
+  if (mv <= (uint16_t)LEAK_VOLT_MIN_MV)
+  {
+    return 0U;
+  }
+  if (mv >= (uint16_t)LEAK_VOLT_MAX_MV)
+  {
+    return (uint16_t)LEAK_CONC_MAX_U16;
+  }
+  {
+    uint32_t num = (uint32_t)(mv - (uint16_t)LEAK_VOLT_MIN_MV) * (uint32_t)LEAK_CONC_MAX_U16;
+    uint32_t den = (uint32_t)((uint16_t)LEAK_VOLT_MAX_MV - (uint16_t)LEAK_VOLT_MIN_MV);
+    uint32_t out = (den == 0U) ? 0U : ((num + den / 2U) / den);
+    if (out > (uint32_t)LEAK_CONC_MAX_U16)
+    {
+      out = (uint32_t)LEAK_CONC_MAX_U16;
+    }
+    return (uint16_t)out;
   }
 }
 
@@ -278,6 +322,34 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+#if !MODBUS_ONLY_TEST
+    if ((HAL_GetTick() - leak_adc_last_tick) >= 100U)
+    {
+      leak_adc_last_tick = HAL_GetTick();
+      if (HAL_ADC_Start(&hadc1) == HAL_OK)
+      {
+        if (HAL_ADC_PollForConversion(&hadc1, 1) == HAL_OK)
+        {
+          uint32_t v = HAL_ADC_GetValue(&hadc1);
+          if (v > 0xFFFFU)
+          {
+            v = 0xFFFFU;
+          }
+          leak_adc_raw = (uint16_t)v;
+          leak_mv = LeakAdc_To_mV(leak_adc_raw);
+          leak_conc_u16 = Leak_mV_To_ConcU16(leak_mv);
+        }
+        (void)HAL_ADC_Stop(&hadc1);
+      }
+    }
+
+    if ((HAL_GetTick() - leak_print_last_tick) >= 500U)
+    {
+      leak_print_last_tick = HAL_GetTick();
+      printf("LEAK adc=%u mv=%u conc=%u\r\n", leak_adc_raw, leak_mv, leak_conc_u16);
+    }
+#endif
+
 #if !MODBUS_ONLY_TEST
     ADS1256_Update();
 
@@ -436,13 +508,13 @@ int main(void)
           }
         }
 
-        printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
-        printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
-               (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
-        printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
-               conc[0], conc[1], conc[2], conc[3]);
-        printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
-               v[0], v[1], v[2], v[3]);
+        // printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
+        // printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
+        //        (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
+        // printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
+        //        conc[0], conc[1], conc[2], conc[3]);
+        // printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
+        //        v[0], v[1], v[2], v[3]);
       }
     }
 #endif
