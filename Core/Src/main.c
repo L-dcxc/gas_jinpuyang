@@ -190,8 +190,20 @@ int main(void)
   }
 
   FRN06_Init();
+  {
+    int32_t off = 0;
+    int32_t scale = 0;
+    if (FRN06_ReadParams(&off, &scale) == HAL_OK)
+    {
+      printf("FRN06 offset=%ld, scale=%ld\r\n", (long)off, (long)scale);
+    }
+    else
+    {
+      printf("FRN06 read params failed\r\n");
+    }
+  }
   (void)FlowCtrl_Init();
-  FlowCtrl_SetTarget_mslm(1000);
+  FlowCtrl_SetTarget_mslm(800);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
   /* USER CODE END 2 */
@@ -261,6 +273,7 @@ int main(void)
         }
         else
         {
+          FlowCtrl_Sample();
           __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
         }
       }

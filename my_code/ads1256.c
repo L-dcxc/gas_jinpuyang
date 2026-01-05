@@ -43,6 +43,10 @@ static int ads1256_wait_drdy_low(uint32_t timeout_ms);
 #define ADS1256_INPUT_SCALE_NUM 2
 #define ADS1256_INPUT_SCALE_DEN 1
 
+#ifndef ADS1256_DRDY_TIMEOUT_MS
+#define ADS1256_DRDY_TIMEOUT_MS 300U
+#endif
+
 #define ADS1256_DRATE_CODE   0x23
 #define ADS1256_DISCARD_SAMPLES 1
 #define ADS1256_AVG_SAMPLES  1
@@ -77,7 +81,7 @@ static int32_t ads1256_read_raw_current_mux(void)
   (void)ads1256_spi_txrx(ADS1256_CMD_SYNC);
   (void)ads1256_spi_txrx(ADS1256_CMD_WAKEUP);
 
-  if (!ads1256_wait_drdy_low(300))
+  if (!ads1256_wait_drdy_low((uint32_t)ADS1256_DRDY_TIMEOUT_MS))
   {
     ads1256_cs_high();
     return (int32_t)0x80000000;
@@ -130,6 +134,7 @@ static int32_t ads1256_read_raw_ainx_aincom_filtered(uint8_t ch)
 void ADS1256_Update(void)
 {
   static uint8_t inited = 0;
+  static uint8_t next_ch = 0;
   static int32_t movavg_buf[ADS1256_USED_CHANNELS][ADS1256_MOVAVG_WIN] = {0};
   static int64_t movavg_sum[ADS1256_USED_CHANNELS] = {0};
   static uint8_t movavg_idx[ADS1256_USED_CHANNELS] = {0};
@@ -141,14 +146,20 @@ void ADS1256_Update(void)
     inited = 1;
   }
 
-  for (uint8_t ch = 0; ch < ADS1256_USED_CHANNELS; ch++)
   {
+    uint8_t ch = next_ch;
+    next_ch++;
+    if (next_ch >= ADS1256_USED_CHANNELS)
+    {
+      next_ch = 0;
+    }
+
     int32_t raw = ads1256_read_raw_ainx_aincom_filtered(ch);
     if (raw == (int32_t)0x80000000)
     {
       g_ads1256_latest_raw[ch] = (int32_t)0x80000000;
       g_ads1256_latest_uv[ch] = (int32_t)0x80000000;
-      continue;
+      return;
     }
 
     {

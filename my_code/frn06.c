@@ -42,6 +42,49 @@ HAL_StatusTypeDef FRN06_Init(void)
   return HAL_OK;
 }
 
+HAL_StatusTypeDef FRN06_ReadParams(int32_t *offset, int32_t *scale)
+{
+  uint8_t cmd[2];
+  uint8_t resp[41];
+  uint8_t crc;
+  HAL_StatusTypeDef st;
+
+  if (offset == NULL || scale == NULL)
+  {
+    return HAL_ERROR;
+  }
+
+  cmd[0] = 0xCC;
+  cmd[1] = 0xDD;
+
+  st = HAL_I2C_Master_Transmit(&hi2c1, FRN06_I2C_ADDR_W, cmd, sizeof(cmd), 100);
+  if (st != HAL_OK)
+  {
+    return st;
+  }
+
+  st = HAL_I2C_Master_Receive(&hi2c1, FRN06_I2C_ADDR_W, resp, sizeof(resp), 100);
+  if (st != HAL_OK)
+  {
+    return st;
+  }
+
+  crc = frn06_crc8_poly131(resp, 40);
+  if (crc != resp[40])
+  {
+    return HAL_ERROR;
+  }
+
+  {
+    uint16_t off_u16 = (uint16_t)(((uint16_t)resp[8] << 8) | (uint16_t)resp[9]);
+    uint16_t scale_u16 = (uint16_t)(((uint16_t)resp[10] << 8) | (uint16_t)resp[11]);
+    *offset = (int32_t)off_u16;
+    *scale = (int32_t)scale_u16;
+  }
+
+  return HAL_OK;
+}
+
 HAL_StatusTypeDef FRN06_ReadFlowRaw(int32_t *raw)
 {
   uint8_t cmd[2];

@@ -16,6 +16,14 @@
 #define FLOWCTRL_REF_PWM_PERIOD 199U
 #endif
 
+#ifndef FLOWCTRL_DEFAULT_KP_REF
+#define FLOWCTRL_DEFAULT_KP_REF 120U
+#endif
+
+#ifndef FLOWCTRL_DEFAULT_KI_REF
+#define FLOWCTRL_DEFAULT_KI_REF 4U
+#endif
+
 static PID_Controller s_pid;
 static int32_t s_target_mslm = 1000;
 static int32_t s_measured_mslm = 0;
@@ -29,6 +37,21 @@ void FlowCtrl_Reset(void)
   s_pwm_compare = 0U;
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
   PID_Reset(&s_pid);
+}
+
+void FlowCtrl_Sample(void)
+{
+  int32_t flow;
+
+  if (!s_inited)
+  {
+    (void)FlowCtrl_Init();
+  }
+
+  if (FRN06_ReadFlow_mslm(&flow) == HAL_OK)
+  {
+    s_measured_mslm = flow;
+  }
 }
 
 HAL_StatusTypeDef FlowCtrl_Init(void)
@@ -54,13 +77,13 @@ HAL_StatusTypeDef FlowCtrl_Init(void)
     scale_num = 1U;
   }
 
-  kp = (uint32_t)((50U * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
+  kp = (uint32_t)((FLOWCTRL_DEFAULT_KP_REF * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
   if (kp < 1U)
   {
     kp = 1U;
   }
 
-  ki = (uint32_t)((1U * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
+  ki = (uint32_t)((FLOWCTRL_DEFAULT_KI_REF * scale_num + (FLOWCTRL_REF_PWM_PERIOD + 1U) / 2U) / (FLOWCTRL_REF_PWM_PERIOD + 1U));
   if (ki < 1U)
   {
     ki = 1U;
@@ -94,7 +117,6 @@ void FlowCtrl_SetTunings(int32_t kp, int32_t ki, int32_t kd)
 
 void FlowCtrl_Update(void)
 {
-  int32_t flow;
   uint32_t now;
 
   if (!s_inited)
@@ -102,10 +124,7 @@ void FlowCtrl_Update(void)
     (void)FlowCtrl_Init();
   }
 
-  if (FRN06_ReadFlow_mslm(&flow) == HAL_OK)
-  {
-    s_measured_mslm = flow;
-  }
+  FlowCtrl_Sample();
 
   now = HAL_GetTick();
   if (s_target_mslm > 0 && s_measured_mslm < (int32_t)FLOWCTRL_STARTUP_BOOST_THRESH_MSLM)
