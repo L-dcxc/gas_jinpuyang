@@ -42,18 +42,34 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+/* USART1 收到任何字节后回 "ok\r\n"（仅用于最初串口连通性测试，默认关闭） */
 #define UART1_RX_REPLY_OK 0
+
+/* printf(USART3) 的单次发送超时，避免调试打印长时间阻塞主循环 */
 #define DEBUG_UART_TX_TIMEOUT_MS 5U
 
+/* 仅做 Modbus 联调时可置 1：关闭 ADS/FRN06/FlowCtrl 等，避免外设影响 */
 #define MODBUS_ONLY_TEST 0
 
+/* 泄漏传感器（PA0/ADC1_IN0）原始 ADC -> 电压（mV）换算用参数 */
 #define LEAK_ADC_VREF_MV 3300U
 #define LEAK_ADC_FULL_SCALE 4095U
 
+/* 泄漏传感器浓度标定（按 ADC 原始值线性映射）
+ * - ADC=2000 -> 0%LEL
+ * - ADC=2100 -> 100%LEL
+ * 输出单位：%LEL x100（0~10000）
+ */
 #define LEAK_ADC_ZERO 2000U
 #define LEAK_ADC_FULL 2100U
 
+/* 浓度单位：%LEL x100（100.00%LEL -> 10000） */
 #define LEAK_CONC_MAX_U16 10000U
+
+/* 三态报警阈值（同样是 %LEL x100）
+ * - >25% 低报（1）
+ * - >50% 高报（2）
+ */
 #define LEAK_ALARM_LOW_TH 2500U
 #define LEAK_ALARM_HIGH_TH 5000U  //高低报阈值
 
@@ -67,21 +83,33 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+/* Modbus 接收中断：每次只收 1 字节（UART IRQ 中不断续接收） */
 uint8_t uart1_rx_byte;
 uint8_t rs485_rx_byte;
 uint8_t uart1_rx_seen;
+
+/* 通信统计（用于调试串口/485 是否有数据进来） */
 uint32_t uart1_rx_cnt;
 uint32_t uart2_rx_cnt;
+
+/* 轮询定时：FRN06 打印 / FlowCtrl 更新 / ADS 打印等 */
 uint32_t frn06_test_last_tick = 0;
 uint32_t flow_ctrl_last_tick = 0;
 uint32_t ads_print_last_tick = 0;
+
+/* 泵使能的上一次状态：用于检测 0->1 或 1->0 变化，触发 FlowCtrl_Reset() */
 uint16_t pump_enable_last = 0;
+
+/* MODBUS_ONLY_TEST 模式下的调试打印节拍 */
 uint32_t modbus_dbg_last_tick = 0;
 
+/* PA0 泄漏传感器采样/打印节拍与结果缓存 */
 uint32_t leak_adc_last_tick = 0;
 uint32_t leak_print_last_tick = 0;
 uint16_t leak_adc_raw = 0;
 uint16_t leak_mv = 0;
+
+/* leak_conc_u16：%LEL x100（0~10000）；leak_state_u16：0正常/1低报/2高报 */
 uint16_t leak_conc_u16 = 0;
 uint16_t leak_state_u16 = 0;
 /* USER CODE END PV */
@@ -95,6 +123,7 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* ADS1256 电压(uV) -> 浓度(%LEL x100) 的线性换算：0.4V=0，2.0V=10000 */
 static uint16_t ADS_uV_To_LelX100(int32_t uv)
 {
   const int32_t zero_uv = 400000;
@@ -182,10 +211,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if (GPIO_Pin == ADS_DRDY_Pin)
   {
+    /* ADS1256 DRDY 下降沿：提示有新数据可读（由 ADS1256_Update() 消费此标志） */
     g_ads1256_drdy_flag = 1U;
   }
 }
 
+/* PA0 原始 ADC -> mV：仅用于打印观察输入电压，控制逻辑不依赖该值 */
 static uint16_t LeakAdc_To_mV(uint16_t adc)
 {
   uint32_t mv = ((uint32_t)adc * (uint32_t)LEAK_ADC_VREF_MV + (LEAK_ADC_FULL_SCALE / 2U)) / (uint32_t)LEAK_ADC_FULL_SCALE;
@@ -198,6 +229,7 @@ static uint16_t LeakAdc_To_mV(uint16_t adc)
 
 static uint16_t LeakAdc_To_ConcU16(uint16_t adc)
 {
+  /* 基于标定点的线性插值：2000->0%LEL，2100->100%LEL（输出%LEL x100） */
   if (adc <= (uint16_t)LEAK_ADC_ZERO)
   {
     return 0U;
@@ -220,6 +252,7 @@ static uint16_t LeakAdc_To_ConcU16(uint16_t adc)
 
 static uint16_t LeakConc_To_StateU16(uint16_t conc_u16)
 {
+  /* 三态报警：0正常/1低报/2高报；同时点亮/熄灭板载 LED(示意) */
   if (conc_u16 > (uint16_t)LEAK_ALARM_HIGH_TH)
   {
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);//开灯
@@ -296,12 +329,18 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
+  /* Modbus 从机：同时挂载到 USART1/USART2，两路共用同一份保持寄存器数据
+   * - USART1：通常接串口屏/上位机
+   * - USART2：通常接 RS485
+   */
   ModbusRTUSlave_Init(&huart1, 1);
   ModbusRTUSlave_Init(&huart2, 1);
 
+  /* 采用中断方式逐字节接收，接收回调里喂给 Modbus 协议栈 */
   HAL_UART_Receive_IT(&huart1, &uart1_rx_byte, 1);
   HAL_UART_Receive_IT(&huart2, &rs485_rx_byte, 1);
 
+  /* NVIC 优先级：让 Modbus 接收优先级高于 ADS 打印，避免丢帧 */
   HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
   HAL_NVIC_SetPriority(USART2_IRQn, 1, 0);
   HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
@@ -359,6 +398,7 @@ int main(void)
 #if !MODBUS_ONLY_TEST
   FRN06_Init();
   {
+    /* FRN06 传感器参数（offset/scale）上电读一次，后续用来做流量单位换算 */
     int32_t off = 0;
     int32_t scale = 0;
     if (FRN06_ReadParams(&off, &scale) == HAL_OK)
@@ -372,8 +412,10 @@ int main(void)
   }
 
   (void)FlowCtrl_Init();
+  /* 默认目标流量：500 mslm（=0.500 slm），可后续改为从 Modbus/界面下发 */
   FlowCtrl_SetTarget_mslm(500);
 
+  /* 板载指示灯：PD12 作为电源/运行灯 */
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);//电源灯
   //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 #endif
@@ -384,6 +426,10 @@ int main(void)
   while (1)
   {
 #if !MODBUS_ONLY_TEST
+    /* PA0 泄漏传感器采样：100ms 采一次（ADC 单次转换方式）
+     * - leak_conc_u16：浓度（%LEL x100）
+     * - leak_state_u16：三态报警（0/1/2）并发布到 Modbus 寄存器
+     */
     if ((HAL_GetTick() - leak_adc_last_tick) >= 100U)
     {
       leak_adc_last_tick = HAL_GetTick();
@@ -406,6 +452,7 @@ int main(void)
       }
     }
 
+    /* 低频打印，避免太多 printf 影响实时控制 */
     if ((HAL_GetTick() - leak_print_last_tick) >= 500U)
     {
       leak_print_last_tick = HAL_GetTick();
@@ -414,6 +461,9 @@ int main(void)
 #endif
 
 #if !MODBUS_ONLY_TEST
+    /* ADS1256 采样更新：驱动内部使用 DRDY 标志做非阻塞采样
+     * 这里每次循环都调用 Update，然后将四路浓度写入 Modbus 保持寄存器 0~3。
+     */
     ADS1256_Update();
 
     {
@@ -434,6 +484,7 @@ int main(void)
     }
 #endif
 
+    /* Modbus 协议栈轮询：解析接收帧并发送响应（两路串口都在这里处理） */
     ModbusRTUSlave_PollAll();
 
 #if MODBUS_ONLY_TEST
@@ -458,6 +509,10 @@ int main(void)
 #endif
 
 #if !MODBUS_ONLY_TEST
+    /* 流量闭环控制：50ms 更新一次
+     * - pump_en 来自 Modbus 寄存器 4（可写），用于开/关泵
+     * - 使能变化时 reset，避免积分项/状态残留
+     */
     if ((HAL_GetTick() - flow_ctrl_last_tick) >= 50U)
     {
       flow_ctrl_last_tick = HAL_GetTick();
@@ -484,6 +539,7 @@ int main(void)
 #endif
 
 #if !MODBUS_ONLY_TEST
+    /* 每 1 秒打印一次流量传感器读数与 PWM 输出，用于现场观察稳定性 */
     if ((HAL_GetTick() - frn06_test_last_tick) >= 1000U)
     {
       frn06_test_last_tick = HAL_GetTick();
@@ -524,6 +580,7 @@ int main(void)
 #endif
 
 #if !MODBUS_ONLY_TEST
+    /* ADS 调试打印：每 200ms 输出一次（raw/uV/conc），便于校准与排错 */
     if ((HAL_GetTick() - ads_print_last_tick) >= 200U)
     {
       ads_print_last_tick = HAL_GetTick();

@@ -4,6 +4,9 @@
 #include "pid.h"
 #include "tim.h"
 
+/* 入口阶段可选的 boost：用于泵刚启动、流量还没起来时，先短时间给一个较大的占空比。
+ * 当前默认关闭（FLOWCTRL_STARTUP_BOOST_MS=0）。
+ */
 #ifndef FLOWCTRL_STARTUP_BOOST_MS
 #define FLOWCTRL_STARTUP_BOOST_MS 0U
 #endif
@@ -24,8 +27,11 @@
 #define FLOWCTRL_DEFAULT_KI_REF 10U
 #endif
 
+/* PID->HOLD（保持占空比）的稳定判定：
+ * - 连续 N 次误差小于等于 stable_err（mslm）即可进入 HOLD。
+ */
 #ifndef FLOWCTRL_HOLD_STABLE_N
-#define FLOWCTRL_HOLD_STABLE_N 5U
+#define FLOWCTRL_HOLD_STABLE_N 8U
 #endif
 
 #ifndef FLOWCTRL_HOLD_STABLE_ERR_MSLM
@@ -33,7 +39,7 @@
 #endif
 
 #ifndef FLOWCTRL_HOLD_REENTER_ERR_MSLM
-#define FLOWCTRL_HOLD_REENTER_ERR_MSLM 60L
+#define FLOWCTRL_HOLD_REENTER_ERR_MSLM 35L
 #endif
 
 typedef enum
@@ -51,6 +57,10 @@ static uint32_t s_pwm_compare = 0;
 static uint8_t s_inited = 0;
 static uint32_t s_boost_until_tick = 0;
 
+/* 控制模式：
+ * - PID：闭环调节
+ * - HOLD：锁定某个占空比（s_hold_pwm_compare），直到误差偏离较大再回到 PID
+ */
 static FlowCtrl_Mode s_mode = FLOWCTRL_MODE_PID;
 static uint32_t s_hold_pwm_compare = 0U;
 static uint8_t s_stable_cnt = 0U;
@@ -62,6 +72,7 @@ static int32_t abs_i32(int32_t x)
 
 void FlowCtrl_Reset(void)
 {
+  /* 泵开/关或模式切换时调用：清理滤波器、状态机与 PID 内部状态 */
   s_boost_until_tick = 0U;
   s_pwm_compare = 0U;
   __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
@@ -93,6 +104,7 @@ void FlowCtrl_Sample(void)
     }
     else
     {
+      /* 简单一阶 IIR：抑制传感器抖动，避免 PID 输出抖动 */
       s_measured_mslm = s_measured_mslm + ((flow - s_measured_mslm) / 5);
     }
   }
@@ -177,12 +189,47 @@ void FlowCtrl_Update(void)
     int32_t err = s_target_mslm - s_measured_mslm;
     if (abs_i32(err) >= (int32_t)FLOWCTRL_HOLD_REENTER_ERR_MSLM)
     {
+      /* HOLD->PID：误差偏离过大，回到 PID 调节。
+       * 关键点：为了避免“回到 PID 的第一下输出掉到 0”（看起来像泵瞬间关了一下），
+       * 这里不再 PID_Reset() 清零，而是用当前 HOLD 的占空比作为 PID 初始输出基准。
+       */
       s_mode = FLOWCTRL_MODE_PID;
       s_stable_cnt = 0U;
-      PID_Reset(&s_pid);
+
+      {
+        /* 让下一次 PID_Update 的输出尽量等于当前占空比：out = P + I + D。
+         * - 先令 prev_err=err，使 D≈0
+         * - 再设置 I = desired_out - P，并限制在积分限幅内
+         */
+        int32_t desired_out = (int32_t)s_hold_pwm_compare;
+        int32_t p = (int32_t)((int64_t)s_pid.kp * (int64_t)err / 1000LL);
+        int32_t i = desired_out - p;
+
+        if (desired_out < s_pid.out_min)
+        {
+          desired_out = s_pid.out_min;
+        }
+        if (desired_out > s_pid.out_max)
+        {
+          desired_out = s_pid.out_max;
+        }
+
+        if (i < s_pid.i_min)
+        {
+          i = s_pid.i_min;
+        }
+        if (i > s_pid.i_max)
+        {
+          i = s_pid.i_max;
+        }
+
+        s_pid.i_state = i;
+        s_pid.prev_err = err;
+      }
     }
     else
     {
+      /* HOLD：保持占空比不变 */
       s_pwm_compare = s_hold_pwm_compare;
       __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, s_pwm_compare);
       return;
@@ -191,6 +238,7 @@ void FlowCtrl_Update(void)
 
   if (s_target_mslm > 0 && s_measured_mslm < (int32_t)FLOWCTRL_STARTUP_BOOST_THRESH_MSLM)
   {
+    /* 可选的启动 boost：目标>0 且流量还很低时，开始计时 boost */
     if (s_boost_until_tick == 0U)
     {
       s_boost_until_tick = now + (uint32_t)FLOWCTRL_STARTUP_BOOST_MS;
@@ -209,6 +257,7 @@ void FlowCtrl_Update(void)
   }
 
   {
+    /* PID 输出到 PWM：PID 输出范围已经配置为 [0, period] */
     int32_t out = PID_Update(&s_pid, s_target_mslm, s_measured_mslm);
     if (out < 0)
     {
@@ -219,6 +268,7 @@ void FlowCtrl_Update(void)
   }
 
   {
+    /* 稳定判定：误差连续满足阈值才进入 HOLD */
     int32_t err = s_target_mslm - s_measured_mslm;
     if (abs_i32(err) <= (int32_t)FLOWCTRL_HOLD_STABLE_ERR_MSLM)
     {
@@ -234,6 +284,7 @@ void FlowCtrl_Update(void)
 
     if (s_stable_cnt >= (uint8_t)FLOWCTRL_HOLD_STABLE_N)
     {
+      /* PID->HOLD：锁定当前占空比 */
       s_mode = FLOWCTRL_MODE_HOLD;
       s_hold_pwm_compare = s_pwm_compare;
       s_stable_cnt = 0U;

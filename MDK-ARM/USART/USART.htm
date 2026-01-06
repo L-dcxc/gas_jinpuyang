@@ -3,7 +3,7 @@
 <title>Static Call Graph - [USART\USART.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image USART\USART.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Tue Jan  6 16:18:08 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Tue Jan  6 20:39:54 2026
 <BR><P>
 <H3>Maximum Stack Usage =        720 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -401,7 +401,8 @@ Global Symbols
 </UL>
 <BR>[Calls]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uldivmod
 </UL>
-<BR>[Called By]<UL><LI><a href="#[7e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;PID_Update
+<BR>[Called By]<UL><LI><a href="#[7d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Update
+<LI><a href="#[7e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;PID_Update
 <LI><a href="#[74]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FRN06_ReadFlow_mslm
 <LI><a href="#[6f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ADS1256_Update
 <LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
@@ -569,14 +570,14 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[7d]"></a>FlowCtrl_Update</STRONG> (Thumb, 288 bytes, Stack size 24 bytes, flow_ctrl.o(.text.FlowCtrl_Update))
-<BR><BR>[Stack]<UL><LI>Max Depth = 144<LI>Call Chain = FlowCtrl_Update &rArr; FRN06_ReadFlow_mslm &rArr; FRN06_ReadFlowRaw &rArr; HAL_I2C_Master_Receive &rArr; I2C_WaitOnRXNEFlagUntilTimeout
+<P><STRONG><a name="[7d]"></a>FlowCtrl_Update</STRONG> (Thumb, 340 bytes, Stack size 40 bytes, flow_ctrl.o(.text.FlowCtrl_Update))
+<BR><BR>[Stack]<UL><LI>Max Depth = 160<LI>Call Chain = FlowCtrl_Update &rArr; FRN06_ReadFlow_mslm &rArr; FRN06_ReadFlowRaw &rArr; HAL_I2C_Master_Receive &rArr; I2C_WaitOnRXNEFlagUntilTimeout
 </UL>
 <BR>[Calls]<UL><LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Init
 <LI><a href="#[7e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;PID_Update
-<LI><a href="#[7a]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;PID_Reset
 <LI><a href="#[74]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FRN06_ReadFlow_mslm
 <LI><a href="#[6b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GetTick
+<LI><a href="#[65]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_ldivmod
 </UL>
 <BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
@@ -1159,8 +1160,7 @@ Global Symbols
 </UL>
 
 <P><STRONG><a name="[7a]"></a>PID_Reset</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, pid.o(.text.PID_Reset))
-<BR><BR>[Called By]<UL><LI><a href="#[7d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Update
-<LI><a href="#[7b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Reset
+<BR><BR>[Called By]<UL><LI><a href="#[7b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Reset
 <LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Init
 </UL>
 
