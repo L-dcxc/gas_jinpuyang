@@ -222,12 +222,15 @@ static uint16_t LeakConc_To_StateU16(uint16_t conc_u16)
 {
   if (conc_u16 > (uint16_t)LEAK_ALARM_HIGH_TH)
   {
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);//开灯
     return 2U;
   }
   if (conc_u16 > (uint16_t)LEAK_ALARM_LOW_TH)
   {
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
     return 1U;
   }
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);//关灯
   return 0U;
 }
 
@@ -371,8 +374,8 @@ int main(void)
   (void)FlowCtrl_Init();
   FlowCtrl_SetTarget_mslm(500);
 
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);//电源灯
+  //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 #endif
   /* USER CODE END 2 */
 
