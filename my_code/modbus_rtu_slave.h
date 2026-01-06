@@ -24,6 +24,11 @@ uint16_t ModbusRTUSlave_GetPumpEnable(void);
 void ModbusRTUSlave_SetLeakState(uint16_t state);
 uint16_t ModbusRTUSlave_GetLeakState(void);
 
+uint16_t ModbusRTUSlave_GetZeroCalibReq(void);
+void ModbusRTUSlave_ClearZeroCalibReq(void);
+void ModbusRTUSlave_SetZeroCalibResult(uint16_t result);
+uint16_t ModbusRTUSlave_GetZeroCalibResult(void);
+
 extern volatile uint32_t g_modbus_rx_ok_frames;
 extern volatile uint32_t g_modbus_rx_bad_crc_frames;
 

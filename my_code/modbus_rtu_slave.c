@@ -31,6 +31,8 @@ static uint8_t s_port_count = 0;
 static volatile uint16_t s_conc_u16[4] = {0, 0, 0, 0};
 static volatile uint16_t s_pump_en = 0;
 static volatile uint16_t s_leak_state = 0;
+static volatile uint16_t s_zero_calib_req = 0xFFFFU;
+static volatile uint16_t s_zero_calib_result = 0U;
 
 volatile uint32_t g_modbus_rx_ok_frames = 0;
 volatile uint32_t g_modbus_rx_bad_crc_frames = 0;
@@ -117,6 +119,16 @@ static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
     *out = (uint16_t)s_leak_state;
     return 1;
   }
+  if (addr_0based == 6U)
+  {
+    *out = (uint16_t)s_zero_calib_req;
+    return 1;
+  }
+  if (addr_0based == 7U)
+  {
+    *out = (uint16_t)s_zero_calib_result;
+    return 1;
+  }
   return 0;
 }
 
@@ -127,6 +139,21 @@ static int write_holding_reg(uint16_t addr_0based, uint16_t val)
     if (val == 0U || val == 1U)
     {
       s_pump_en = val;
+      return 1;
+    }
+    return 0;
+  }
+  if (addr_0based == 6U)
+  {
+    if (val == 0xFFFFU)
+    {
+      s_zero_calib_req = 0xFFFFU;
+      return 1;
+    }
+    if (val < 4U)
+    {
+      s_zero_calib_req = val;
+      s_zero_calib_result = 0U;
       return 1;
     }
     return 0;
@@ -173,6 +200,26 @@ void ModbusRTUSlave_SetLeakState(uint16_t state)
 uint16_t ModbusRTUSlave_GetLeakState(void)
 {
   return (uint16_t)s_leak_state;
+}
+
+uint16_t ModbusRTUSlave_GetZeroCalibReq(void)
+{
+  return (uint16_t)s_zero_calib_req;
+}
+
+void ModbusRTUSlave_ClearZeroCalibReq(void)
+{
+  s_zero_calib_req = 0xFFFFU;
+}
+
+void ModbusRTUSlave_SetZeroCalibResult(uint16_t result)
+{
+  s_zero_calib_result = result;
+}
+
+uint16_t ModbusRTUSlave_GetZeroCalibResult(void)
+{
+  return (uint16_t)s_zero_calib_result;
 }
 
 static void handle_read_holding_regs(ModbusPort *p, const uint8_t *frame, uint16_t len)

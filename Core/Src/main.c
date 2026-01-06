@@ -32,6 +32,8 @@
 #include "frn06.h"
 #include "flow_ctrl.h"
 #include "modbus_rtu_slave.h"
+#include "w25q64_flash.h"
+#include "gas_calib.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -112,6 +114,8 @@ uint16_t leak_mv = 0;
 /* leak_conc_u16：%LEL x100（0~10000）；leak_state_u16：0正常/1低报/2高报 */
 uint16_t leak_conc_u16 = 0;
 uint16_t leak_state_u16 = 0;
+
+int32_t g_ads_zero_uv[GAS_CALIB_CH_COUNT] = {400000, 400000, 400000, 400000};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -123,10 +127,9 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-/* ADS1256 电压(uV) -> 浓度(%LEL x100) 的线性换算：0.4V=0，2.0V=10000 */
-static uint16_t ADS_uV_To_LelX100(int32_t uv)
+/* ADS1256 电压(uV) -> 浓度(%LEL x100) 的线性换算：zero_uv=0，2.0V=10000 */
+static uint16_t ADS_uV_To_LelX100(int32_t uv, int32_t zero_uv)
 {
-  const int32_t zero_uv = 400000;
   const int32_t full_uv = 2000000;
   const int32_t span_uv = (full_uv - zero_uv);
 
@@ -328,6 +331,7 @@ int main(void)
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_TIM4_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
   /* Modbus 从机：同时挂载到 USART1/USART2，两路共用同一份保持寄存器数据
    * - USART1：通常接串口屏/上位机
@@ -380,6 +384,18 @@ int main(void)
   HAL_GPIO_WritePin(ADS_RST_GPIO_Port, ADS_RST_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(RS485_DE_GPIO_Port, RS485_DE_Pin, GPIO_PIN_RESET);
   printf("open is OK!!!\r\n");
+
+  if (W25Q64_Init() == 0)
+  {
+    int32_t z[GAS_CALIB_CH_COUNT];
+    if (GasCalib_LoadZeroUv(z) == 0)
+    {
+      for (uint8_t i = 0; i < GAS_CALIB_CH_COUNT; i++)
+      {
+        g_ads_zero_uv[i] = z[i];
+      }
+    }
+  }
   /* 为了避免线路未接/接触不良导致“浮空随机值”，这里在运行时做一次 GPIO 重新配置：
    * - DRDY：输入上拉（未接时稳定为 1；接上后由 ADS1256 驱动）
    * - SPI1 MISO(PA6)：AF 无上下拉（由 ADS1256 DOUT 推挽驱动）
@@ -467,6 +483,31 @@ int main(void)
     ADS1256_Update();
 
     {
+      uint16_t req = ModbusRTUSlave_GetZeroCalibReq();
+      if (req < 4U)
+      {
+        int32_t uv = ADS1256_GetLatestUv((uint8_t)req);
+        if (uv == (int32_t)0x80000000 || uv == (int32_t)0x80000001)
+        {
+          ModbusRTUSlave_SetZeroCalibResult(3U);
+        }
+        else
+        {
+          g_ads_zero_uv[req] = uv;
+          if (GasCalib_SaveZeroUv(g_ads_zero_uv) == 0)
+          {
+            ModbusRTUSlave_SetZeroCalibResult(1U);
+          }
+          else
+          {
+            ModbusRTUSlave_SetZeroCalibResult(2U);
+          }
+        }
+        ModbusRTUSlave_ClearZeroCalibReq();
+      }
+    }
+
+    {
       uint16_t conc_u16[4];
       for (uint8_t ch = 0; ch < 4U; ch++)
       {
@@ -477,7 +518,7 @@ int main(void)
         }
         else
         {
-          conc_u16[ch] = ADS_uV_To_LelX100(uv);
+          conc_u16[ch] = ADS_uV_To_LelX100(uv, g_ads_zero_uv[ch]);
         }
         ModbusRTUSlave_SetConcentrationU16(ch, conc_u16[ch]);
       }
@@ -601,7 +642,7 @@ int main(void)
           }
           else
           {
-            conc_u16[ch] = ADS_uV_To_LelX100(uv[ch]);
+            conc_u16[ch] = ADS_uV_To_LelX100(uv[ch], g_ads_zero_uv[ch]);
           }
         }
 
@@ -612,6 +653,8 @@ int main(void)
                (unsigned int)conc_u16[0], (unsigned int)conc_u16[1], (unsigned int)conc_u16[2], (unsigned int)conc_u16[3]);
         printf("ADS volt(uV): ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
                (long)uv[0], (long)uv[1], (long)uv[2], (long)uv[3]);
+        printf("ADS zero(uV): ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
+               (long)g_ads_zero_uv[0], (long)g_ads_zero_uv[1], (long)g_ads_zero_uv[2], (long)g_ads_zero_uv[3]);
       }
     }
 #endif

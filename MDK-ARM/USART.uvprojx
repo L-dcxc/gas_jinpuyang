@@ -660,6 +660,16 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32f4xx_hal_msp.c</FilePath>
             </File>
+            <File>
+              <FileName>gas_calib.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\my_code\gas_calib.c</FilePath>
+            </File>
+            <File>
+              <FileName>w25q64_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\my_code\w25q64_flash.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

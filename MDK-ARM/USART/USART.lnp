@@ -14,6 +14,8 @@
 "usart\usart.o"
 "usart\stm32f4xx_it.o"
 "usart\stm32f4xx_hal_msp.o"
+"usart\gas_calib.o"
+"usart\w25q64_flash.o"
 "usart\stm32f4xx_hal_adc.o"
 "usart\stm32f4xx_hal_adc_ex.o"
 "usart\stm32f4xx_ll_adc.o"
