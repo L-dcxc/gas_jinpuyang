@@ -49,9 +49,13 @@
 
 #define LEAK_ADC_VREF_MV 3300U
 #define LEAK_ADC_FULL_SCALE 4095U
-#define LEAK_VOLT_MIN_MV 400U
-#define LEAK_VOLT_MAX_MV 2000U
+
+#define LEAK_ADC_ZERO 2000U
+#define LEAK_ADC_FULL 2100U
+
 #define LEAK_CONC_MAX_U16 10000U
+#define LEAK_ALARM_LOW_TH 2500U
+#define LEAK_ALARM_HIGH_TH 5000U  //高低报阈值
 
 /* USER CODE END PD */
 
@@ -79,6 +83,7 @@ uint32_t leak_print_last_tick = 0;
 uint16_t leak_adc_raw = 0;
 uint16_t leak_mv = 0;
 uint16_t leak_conc_u16 = 0;
+uint16_t leak_state_u16 = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -89,6 +94,44 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static uint16_t ADS_uV_To_LelX100(int32_t uv)
+{
+  const int32_t zero_uv = 400000;
+  const int32_t full_uv = 2000000;
+  const int32_t span_uv = (full_uv - zero_uv);
+
+  if (uv <= zero_uv)
+  {
+    return 0U;
+  }
+  if (uv >= full_uv)
+  {
+    return 10000U;
+  }
+  if (span_uv <= 0)
+  {
+    return 0U;
+  }
+
+  {
+    int64_t num = (int64_t)(uv - zero_uv) * 10000LL;
+    int64_t den = (int64_t)span_uv;
+    num += den / 2;
+    {
+      int64_t out = num / den;
+      if (out < 0)
+      {
+        out = 0;
+      }
+      if (out > 10000)
+      {
+        out = 10000;
+      }
+      return (uint16_t)out;
+    }
+  }
+}
 /**
   * @brief 串口接收完成中断回调函数
   * @note  当前仅对 USART1 做回显测试：收到 1 字节就立即回发。
@@ -153,26 +196,39 @@ static uint16_t LeakAdc_To_mV(uint16_t adc)
   return (uint16_t)mv;
 }
 
-static uint16_t Leak_mV_To_ConcU16(uint16_t mv)
+static uint16_t LeakAdc_To_ConcU16(uint16_t adc)
 {
-  if (mv <= (uint16_t)LEAK_VOLT_MIN_MV)
+  if (adc <= (uint16_t)LEAK_ADC_ZERO)
   {
     return 0U;
   }
-  if (mv >= (uint16_t)LEAK_VOLT_MAX_MV)
+  if (adc >= (uint16_t)LEAK_ADC_FULL)
   {
     return (uint16_t)LEAK_CONC_MAX_U16;
   }
   {
-    uint32_t num = (uint32_t)(mv - (uint16_t)LEAK_VOLT_MIN_MV) * (uint32_t)LEAK_CONC_MAX_U16;
-    uint32_t den = (uint32_t)((uint16_t)LEAK_VOLT_MAX_MV - (uint16_t)LEAK_VOLT_MIN_MV);
-    uint32_t out = (den == 0U) ? 0U : ((num + den / 2U) / den);
+    uint32_t span = (uint32_t)((uint16_t)LEAK_ADC_FULL - (uint16_t)LEAK_ADC_ZERO);
+    uint32_t num = (uint32_t)(adc - (uint16_t)LEAK_ADC_ZERO) * (uint32_t)LEAK_CONC_MAX_U16;
+    uint32_t out = (span == 0U) ? 0U : ((num + span / 2U) / span);
     if (out > (uint32_t)LEAK_CONC_MAX_U16)
     {
       out = (uint32_t)LEAK_CONC_MAX_U16;
     }
     return (uint16_t)out;
   }
+}
+
+static uint16_t LeakConc_To_StateU16(uint16_t conc_u16)
+{
+  if (conc_u16 > (uint16_t)LEAK_ALARM_HIGH_TH)
+  {
+    return 2U;
+  }
+  if (conc_u16 > (uint16_t)LEAK_ALARM_LOW_TH)
+  {
+    return 1U;
+  }
+  return 0U;
 }
 
 /**
@@ -339,7 +395,9 @@ int main(void)
           }
           leak_adc_raw = (uint16_t)v;
           leak_mv = LeakAdc_To_mV(leak_adc_raw);
-          leak_conc_u16 = Leak_mV_To_ConcU16(leak_mv);
+          leak_conc_u16 = LeakAdc_To_ConcU16(leak_adc_raw);
+          leak_state_u16 = LeakConc_To_StateU16(leak_conc_u16);
+          ModbusRTUSlave_SetLeakState(leak_state_u16);
         }
         (void)HAL_ADC_Stop(&hadc1);
       }
@@ -348,7 +406,7 @@ int main(void)
     if ((HAL_GetTick() - leak_print_last_tick) >= 500U)
     {
       leak_print_last_tick = HAL_GetTick();
-      printf("LEAK adc=%u mv=%u conc=%u\r\n", leak_adc_raw, leak_mv, leak_conc_u16);
+      printf("LEAK adc=%u mv=%u conc=%u state=%u\r\n", leak_adc_raw, leak_mv, leak_conc_u16, leak_state_u16);
     }
 #endif
 
@@ -356,38 +414,17 @@ int main(void)
     ADS1256_Update();
 
     {
-      float conc_f[4];
       uint16_t conc_u16[4];
       for (uint8_t ch = 0; ch < 4U; ch++)
       {
         int32_t uv = ADS1256_GetLatestUv(ch);
-        float v = (float)uv / 1000000.0f;
-        float conc;
-        if (v <= 0.4f)
-        {
-          conc = 0.0f;
-        }
-        else if (v >= 2.0f)
-        {
-          conc = 10000.0f;
-        }
-        else
-        {
-          conc = (v - 0.4f) * (10000.0f / 1.6f);
-        }
-        conc_f[ch] = conc;
-
-        if (conc <= 0.0f)
+        if (uv == (int32_t)0x80000000 || uv == (int32_t)0x80000001)
         {
           conc_u16[ch] = 0U;
         }
-        else if (conc >= 65535.0f)
-        {
-          conc_u16[ch] = 65535U;
-        }
         else
         {
-          conc_u16[ch] = (uint16_t)(conc + 0.5f);
+          conc_u16[ch] = ADS_uV_To_LelX100(uv);
         }
         ModbusRTUSlave_SetConcentrationU16(ch, conc_u16[ch]);
       }
@@ -490,8 +527,7 @@ int main(void)
       {
         int32_t raw[4];
         int32_t uv[4];
-        float v[4];
-        float conc[4];
+        uint16_t conc_u16[4];
         GPIO_PinState drdy = HAL_GPIO_ReadPin(ADS_DRDY_GPIO_Port, ADS_DRDY_Pin);
         uint8_t status = ADS1256_ReadStatus();
 
@@ -499,28 +535,23 @@ int main(void)
         {
           raw[ch] = ADS1256_GetLatestRaw(ch);
           uv[ch] = ADS1256_GetLatestUv(ch);
-          v[ch] = (float)uv[ch] / 1000000.0f;
-          if (v[ch] <= 0.4f)
+          if (uv[ch] == (int32_t)0x80000000 || uv[ch] == (int32_t)0x80000001)
           {
-            conc[ch] = 0.0f;
-          }
-          else if (v[ch] >= 2.0f)
-          {
-            conc[ch] = 10000.0f;
+            conc_u16[ch] = 0U;
           }
           else
           {
-            conc[ch] = (v[ch] - 0.4f) * (10000.0f / 1.6f);
+            conc_u16[ch] = ADS_uV_To_LelX100(uv[ch]);
           }
         }
 
         printf("ADS drdy=%d status=0x%02X\r\n", (int)drdy, status);
         printf("ADS raw : ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
                (long)raw[0], (long)raw[1], (long)raw[2], (long)raw[3]);
-        printf("ADS conc: ch0=%0.2f ch1=%0.2f ch2=%0.2f ch3=%0.2f\r\n",
-               conc[0], conc[1], conc[2], conc[3]);
-        printf("ADS volt: ch0=%0.6f ch1=%0.6f ch2=%0.6f ch3=%0.6f\r\n",
-               v[0], v[1], v[2], v[3]);
+        printf("ADS conc: ch0=%u ch1=%u ch2=%u ch3=%u\r\n",
+               (unsigned int)conc_u16[0], (unsigned int)conc_u16[1], (unsigned int)conc_u16[2], (unsigned int)conc_u16[3]);
+        printf("ADS volt(uV): ch0=%ld ch1=%ld ch2=%ld ch3=%ld\r\n",
+               (long)uv[0], (long)uv[1], (long)uv[2], (long)uv[3]);
       }
     }
 #endif

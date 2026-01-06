@@ -21,6 +21,9 @@ uint16_t ModbusRTUSlave_GetConcentrationU16(uint8_t ch);
 void ModbusRTUSlave_SetPumpEnable(uint16_t en);
 uint16_t ModbusRTUSlave_GetPumpEnable(void);
 
+void ModbusRTUSlave_SetLeakState(uint16_t state);
+uint16_t ModbusRTUSlave_GetLeakState(void);
+
 extern volatile uint32_t g_modbus_rx_ok_frames;
 extern volatile uint32_t g_modbus_rx_bad_crc_frames;
 

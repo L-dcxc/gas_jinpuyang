@@ -30,6 +30,7 @@ static uint8_t s_port_count = 0;
 
 static volatile uint16_t s_conc_u16[4] = {0, 0, 0, 0};
 static volatile uint16_t s_pump_en = 0;
+static volatile uint16_t s_leak_state = 0;
 
 volatile uint32_t g_modbus_rx_ok_frames = 0;
 volatile uint32_t g_modbus_rx_bad_crc_frames = 0;
@@ -111,6 +112,11 @@ static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
     *out = (uint16_t)s_pump_en;
     return 1;
   }
+  if (addr_0based == 5U)
+  {
+    *out = (uint16_t)s_leak_state;
+    return 1;
+  }
   return 0;
 }
 
@@ -153,6 +159,20 @@ void ModbusRTUSlave_SetPumpEnable(uint16_t en)
 uint16_t ModbusRTUSlave_GetPumpEnable(void)
 {
   return (uint16_t)s_pump_en;
+}
+
+void ModbusRTUSlave_SetLeakState(uint16_t state)
+{
+  if (state > 2U)
+  {
+    state = 2U;
+  }
+  s_leak_state = state;
+}
+
+uint16_t ModbusRTUSlave_GetLeakState(void)
+{
+  return (uint16_t)s_leak_state;
 }
 
 static void handle_read_holding_regs(ModbusPort *p, const uint8_t *frame, uint16_t len)
