@@ -126,7 +126,12 @@ static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
   }
   if (addr_0based == 7U)
   {
-    *out = (uint16_t)s_zero_calib_result;
+    uint16_t v = (uint16_t)s_zero_calib_result;
+    *out = v;
+    if (v != 0U)
+    {
+      s_zero_calib_result = 0U;
+    }
     return 1;
   }
   return 0;

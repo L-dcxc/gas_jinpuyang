@@ -137,9 +137,9 @@ static uint16_t ADS_uV_To_LelX100(int32_t uv, int32_t zero_uv)
   {
     return 0U;
   }
-  if (uv >= full_uv)
+  if (uv > full_uv)
   {
-    return 10000U;
+    return 10001U;
   }
   if (span_uv <= 0)
   {
@@ -153,6 +153,10 @@ static uint16_t ADS_uV_To_LelX100(int32_t uv, int32_t zero_uv)
     {
       int64_t out = num / den;
       if (out < 0)
+      {
+        out = 0;
+      }
+      if (out < 50)
       {
         out = 0;
       }
