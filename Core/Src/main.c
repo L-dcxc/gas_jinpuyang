@@ -513,19 +513,26 @@ int main(void)
 
     {
       uint16_t conc_u16[4];
+      uint16_t fault_mask = 0U;
       for (uint8_t ch = 0; ch < 4U; ch++)
       {
         int32_t uv = ADS1256_GetLatestUv(ch);
         if (uv == (int32_t)0x80000000 || uv == (int32_t)0x80000001)
         {
+          fault_mask |= (uint16_t)(1U << ch);
           conc_u16[ch] = 0U;
         }
         else
         {
+          if (uv < 240000)
+          {
+            fault_mask |= (uint16_t)(1U << ch);
+          }
           conc_u16[ch] = ADS_uV_To_LelX100(uv, g_ads_zero_uv[ch]);
         }
         ModbusRTUSlave_SetConcentrationU16(ch, conc_u16[ch]);
       }
+      ModbusRTUSlave_SetSensorFaultMask(fault_mask);
     }
 #endif
 

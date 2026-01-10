@@ -24,6 +24,9 @@ uint16_t ModbusRTUSlave_GetPumpEnable(void);
 void ModbusRTUSlave_SetLeakState(uint16_t state);
 uint16_t ModbusRTUSlave_GetLeakState(void);
 
+void ModbusRTUSlave_SetSensorFaultMask(uint16_t mask);
+uint16_t ModbusRTUSlave_GetSensorFaultMask(void);
+
 uint16_t ModbusRTUSlave_GetZeroCalibReq(void);
 void ModbusRTUSlave_ClearZeroCalibReq(void);
 void ModbusRTUSlave_SetZeroCalibResult(uint16_t result);

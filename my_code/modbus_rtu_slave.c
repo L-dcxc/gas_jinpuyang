@@ -33,6 +33,7 @@ static volatile uint16_t s_pump_en = 0;
 static volatile uint16_t s_leak_state = 0;
 static volatile uint16_t s_zero_calib_req = 0xFFFFU;
 static volatile uint16_t s_zero_calib_result = 0U;
+static volatile uint16_t s_sensor_fault_mask = 0U;
 
 volatile uint32_t g_modbus_rx_ok_frames = 0;
 volatile uint32_t g_modbus_rx_bad_crc_frames = 0;
@@ -134,6 +135,11 @@ static int read_holding_reg(uint16_t addr_0based, uint16_t *out)
     }
     return 1;
   }
+  if (addr_0based == 8U)
+  {
+    *out = (uint16_t)s_sensor_fault_mask;
+    return 1;
+  }
   return 0;
 }
 
@@ -205,6 +211,16 @@ void ModbusRTUSlave_SetLeakState(uint16_t state)
 uint16_t ModbusRTUSlave_GetLeakState(void)
 {
   return (uint16_t)s_leak_state;
+}
+
+void ModbusRTUSlave_SetSensorFaultMask(uint16_t mask)
+{
+  s_sensor_fault_mask = mask;
+}
+
+uint16_t ModbusRTUSlave_GetSensorFaultMask(void)
+{
+  return (uint16_t)s_sensor_fault_mask;
 }
 
 uint16_t ModbusRTUSlave_GetZeroCalibReq(void)

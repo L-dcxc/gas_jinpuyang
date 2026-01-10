@@ -3,7 +3,7 @@
 <title>Static Call Graph - [USART\USART.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image USART\USART.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Wed Jan  7 23:17:00 2026
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6070001: Last Updated: Sat Jan 10 17:09:03 2026
 <BR><P>
 <H3>Maximum Stack Usage =        736 bytes + Unknown(Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -126,7 +126,7 @@ Global Symbols
 <P><STRONG><a name="[5d]"></a>__main</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry.o(.ARM.Collect$$$$00000000))
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f407xx.o(.text)
 </UL>
-<P><STRONG><a name="[df]"></a>_main_stk</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry2.o(.ARM.Collect$$$$00000001))
+<P><STRONG><a name="[e0]"></a>_main_stk</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry2.o(.ARM.Collect$$$$00000001))
 
 <P><STRONG><a name="[60]"></a>_main_scatterload</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry5.o(.ARM.Collect$$$$00000004))
 <BR><BR>[Calls]<UL><LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__scatterload
@@ -136,15 +136,15 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[61]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__scatterload
 </UL>
 
-<P><STRONG><a name="[e0]"></a>_main_clock</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry7b.o(.ARM.Collect$$$$00000008))
+<P><STRONG><a name="[e1]"></a>_main_clock</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry7b.o(.ARM.Collect$$$$00000008))
 
-<P><STRONG><a name="[e1]"></a>_main_cpp_init</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry8b.o(.ARM.Collect$$$$0000000A))
+<P><STRONG><a name="[e2]"></a>_main_cpp_init</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry8b.o(.ARM.Collect$$$$0000000A))
 
-<P><STRONG><a name="[e2]"></a>_main_init</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry9a.o(.ARM.Collect$$$$0000000B))
+<P><STRONG><a name="[e3]"></a>_main_init</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry9a.o(.ARM.Collect$$$$0000000B))
 
-<P><STRONG><a name="[e3]"></a>__rt_final_cpp</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry10a.o(.ARM.Collect$$$$0000000D))
+<P><STRONG><a name="[e4]"></a>__rt_final_cpp</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry10a.o(.ARM.Collect$$$$0000000D))
 
-<P><STRONG><a name="[e4]"></a>__rt_final_exit</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry11a.o(.ARM.Collect$$$$0000000F))
+<P><STRONG><a name="[e5]"></a>__rt_final_exit</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, entry11a.o(.ARM.Collect$$$$0000000F))
 
 <P><STRONG><a name="[0]"></a>Reset_Handler</STRONG> (Thumb, 8 bytes, Stack size 0 bytes, startup_stm32f407xx.o(.text))
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f407xx.o(RESET)
@@ -391,7 +391,7 @@ Global Symbols
 <LI><a href="#[64]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_llsl
 </UL>
 <BR>[Called By]<UL><LI><a href="#[97]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_RCC_GetSysClockFreq
-<LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
+<LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
 <LI><a href="#[65]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_ldivmod
 <LI><a href="#[af]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;UART_SetConfig
 </UL>
@@ -412,13 +412,13 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uldivmod
 </UL>
 
-<P><STRONG><a name="[e5]"></a>_ll_shift_l</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, llshl.o(.text), UNUSED)
+<P><STRONG><a name="[e6]"></a>_ll_shift_l</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, llshl.o(.text), UNUSED)
 
 <P><STRONG><a name="[63]"></a>__aeabi_llsr</STRONG> (Thumb, 32 bytes, Stack size 0 bytes, llushr.o(.text))
 <BR><BR>[Called By]<UL><LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uldivmod
 </UL>
 
-<P><STRONG><a name="[e6]"></a>_ll_ushift_r</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, llushr.o(.text), UNUSED)
+<P><STRONG><a name="[e7]"></a>_ll_ushift_r</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, llushr.o(.text), UNUSED)
 
 <P><STRONG><a name="[61]"></a>__scatterload</STRONG> (Thumb, 28 bytes, Stack size 0 bytes, init.o(.text))
 <BR><BR>[Calls]<UL><LI><a href="#[66]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__main_after_scatterload
@@ -426,7 +426,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[60]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_main_scatterload
 </UL>
 
-<P><STRONG><a name="[e7]"></a>__scatterload_rt2</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, init.o(.text), UNUSED)
+<P><STRONG><a name="[e8]"></a>__scatterload_rt2</STRONG> (Thumb, 0 bytes, Stack size 0 bytes, init.o(.text), UNUSED)
 
 <P><STRONG><a name="[ce]"></a>ADS1256_GetLatestRaw</STRONG> (Thumb, 28 bytes, Stack size 0 bytes, ads1256.o(.text.ADS1256_GetLatestRaw))
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
@@ -531,11 +531,11 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[d9]"></a>FlowCtrl_GetMeasured_mslm</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, flow_ctrl.o(.text.FlowCtrl_GetMeasured_mslm))
+<P><STRONG><a name="[da]"></a>FlowCtrl_GetMeasured_mslm</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, flow_ctrl.o(.text.FlowCtrl_GetMeasured_mslm))
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[da]"></a>FlowCtrl_GetPwmCompare</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, flow_ctrl.o(.text.FlowCtrl_GetPwmCompare))
+<P><STRONG><a name="[db]"></a>FlowCtrl_GetPwmCompare</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, flow_ctrl.o(.text.FlowCtrl_GetPwmCompare))
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
@@ -1170,7 +1170,7 @@ Global Symbols
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[d8]"></a>ModbusRTUSlave_GetPumpEnable</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_GetPumpEnable))
+<P><STRONG><a name="[d9]"></a>ModbusRTUSlave_GetPumpEnable</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_GetPumpEnable))
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
@@ -1199,7 +1199,7 @@ Global Symbols
 <LI><a href="#[2f]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;USART1_IRQHandler
 </UL>
 
-<P><STRONG><a name="[c3]"></a>ModbusRTUSlave_PollAll</STRONG> (Thumb, 3866 bytes, Stack size 576 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_PollAll))
+<P><STRONG><a name="[c3]"></a>ModbusRTUSlave_PollAll</STRONG> (Thumb, 3882 bytes, Stack size 576 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_PollAll))
 <BR><BR>[Stack]<UL><LI>Max Depth = 608<LI>Call Chain = ModbusRTUSlave_PollAll &rArr; HAL_UART_Transmit
 </UL>
 <BR>[Calls]<UL><LI><a href="#[b3]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Transmit
@@ -1213,6 +1213,10 @@ Global Symbols
 </UL>
 
 <P><STRONG><a name="[d2]"></a>ModbusRTUSlave_SetLeakState</STRONG> (Thumb, 18 bytes, Stack size 0 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_SetLeakState))
+<BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
+</UL>
+
+<P><STRONG><a name="[d8]"></a>ModbusRTUSlave_SetSensorFaultMask</STRONG> (Thumb, 12 bytes, Stack size 0 bytes, modbus_rtu_slave.o(.text.ModbusRTUSlave_SetSensorFaultMask))
 <BR><BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
@@ -1352,24 +1356,25 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> printf8.o(i.__0printf$8)
 </UL>
-<P><STRONG><a name="[5b]"></a>main</STRONG> (Thumb, 2744 bytes, Stack size 128 bytes, main.o(.text.main))
+<P><STRONG><a name="[5b]"></a>main</STRONG> (Thumb, 2852 bytes, Stack size 128 bytes, main.o(.text.main))
 <BR><BR>[Stack]<UL><LI>Max Depth = 736<LI>Call Chain = main &rArr; ModbusRTUSlave_PollAll &rArr; HAL_UART_Transmit
 </UL>
 <BR>[Calls]<UL><LI><a href="#[d5]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_SetZeroCalibResult
+<LI><a href="#[d8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_SetSensorFaultMask
 <LI><a href="#[d2]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_SetLeakState
 <LI><a href="#[d7]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_SetConcentrationU16
 <LI><a href="#[c3]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_PollAll
 <LI><a href="#[c2]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_Init
 <LI><a href="#[d4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_GetZeroCalibReq
-<LI><a href="#[d8]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_GetPumpEnable
+<LI><a href="#[d9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_GetPumpEnable
 <LI><a href="#[d6]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;ModbusRTUSlave_ClearZeroCalibReq
 <LI><a href="#[7d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Update
 <LI><a href="#[cd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_SetTarget_mslm
 <LI><a href="#[7c]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Sample
 <LI><a href="#[7b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Reset
 <LI><a href="#[76]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_Init
-<LI><a href="#[da]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_GetPwmCompare
-<LI><a href="#[d9]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_GetMeasured_mslm
+<LI><a href="#[db]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_GetPwmCompare
+<LI><a href="#[da]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FlowCtrl_GetMeasured_mslm
 <LI><a href="#[75]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FRN06_ReadParams
 <LI><a href="#[74]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FRN06_ReadFlow_mslm
 <LI><a href="#[71]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;FRN06_ReadFlowRaw
@@ -1411,11 +1416,11 @@ Global Symbols
 </UL>
 <BR>[Address Reference Count : 1]<UL><LI> entry9a.o(.ARM.Collect$$$$0000000B)
 </UL>
-<P><STRONG><a name="[db]"></a>__0printf$8</STRONG> (Thumb, 22 bytes, Stack size 24 bytes, printf8.o(i.__0printf$8), UNUSED)
-<BR><BR>[Calls]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
+<P><STRONG><a name="[dc]"></a>__0printf$8</STRONG> (Thumb, 22 bytes, Stack size 24 bytes, printf8.o(i.__0printf$8), UNUSED)
+<BR><BR>[Calls]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
 </UL>
 
-<P><STRONG><a name="[e8]"></a>__1printf$8</STRONG> (Thumb, 0 bytes, Stack size 24 bytes, printf8.o(i.__0printf$8), UNUSED)
+<P><STRONG><a name="[e9]"></a>__1printf$8</STRONG> (Thumb, 0 bytes, Stack size 24 bytes, printf8.o(i.__0printf$8), UNUSED)
 
 <P><STRONG><a name="[cc]"></a>__2printf</STRONG> (Thumb, 0 bytes, Stack size 24 bytes, printf8.o(i.__0printf$8))
 <BR><BR>[Stack]<UL><LI>Max Depth = 24<LI>Call Chain = __2printf
@@ -1423,11 +1428,11 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[5b]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[e9]"></a>__scatterload_copy</STRONG> (Thumb, 14 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_copy), UNUSED)
+<P><STRONG><a name="[ea]"></a>__scatterload_copy</STRONG> (Thumb, 14 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_copy), UNUSED)
 
-<P><STRONG><a name="[ea]"></a>__scatterload_null</STRONG> (Thumb, 2 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_null), UNUSED)
+<P><STRONG><a name="[eb]"></a>__scatterload_null</STRONG> (Thumb, 2 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_null), UNUSED)
 
-<P><STRONG><a name="[eb]"></a>__scatterload_zeroinit</STRONG> (Thumb, 14 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_zeroinit), UNUSED)
+<P><STRONG><a name="[ec]"></a>__scatterload_zeroinit</STRONG> (Thumb, 14 bytes, Stack size unknown bytes, handlers.o(i.__scatterload_zeroinit), UNUSED)
 
 <P><STRONG><a name="[ca]"></a>puts</STRONG> (Thumb, 30 bytes, Stack size 8 bytes, puts.o(i.puts))
 <BR><BR>[Stack]<UL><LI>Max Depth = 56<LI>Call Chain = puts &rArr; fputc &rArr; HAL_UART_Transmit
@@ -1530,20 +1535,20 @@ Local Symbols
 <BR>[Called By]<UL><LI><a href="#[ad]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_UART_Init
 </UL>
 
-<P><STRONG><a name="[dc]"></a>_printf_core</STRONG> (Thumb, 996 bytes, Stack size 104 bytes, printf8.o(i._printf_core), UNUSED)
-<BR><BR>[Calls]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_pre_padding
-<LI><a href="#[de]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_post_padding
+<P><STRONG><a name="[dd]"></a>_printf_core</STRONG> (Thumb, 996 bytes, Stack size 104 bytes, printf8.o(i._printf_core), UNUSED)
+<BR><BR>[Calls]<UL><LI><a href="#[de]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_pre_padding
+<LI><a href="#[df]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_post_padding
 <LI><a href="#[62]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_uldivmod
 </UL>
-<BR>[Called By]<UL><LI><a href="#[db]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__0printf$8
+<BR>[Called By]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__0printf$8
 </UL>
 
-<P><STRONG><a name="[de]"></a>_printf_post_padding</STRONG> (Thumb, 36 bytes, Stack size 24 bytes, printf8.o(i._printf_post_padding), UNUSED)
-<BR><BR>[Called By]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
+<P><STRONG><a name="[df]"></a>_printf_post_padding</STRONG> (Thumb, 36 bytes, Stack size 24 bytes, printf8.o(i._printf_post_padding), UNUSED)
+<BR><BR>[Called By]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
 </UL>
 
-<P><STRONG><a name="[dd]"></a>_printf_pre_padding</STRONG> (Thumb, 46 bytes, Stack size 24 bytes, printf8.o(i._printf_pre_padding), UNUSED)
-<BR><BR>[Called By]<UL><LI><a href="#[dc]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
+<P><STRONG><a name="[de]"></a>_printf_pre_padding</STRONG> (Thumb, 46 bytes, Stack size 24 bytes, printf8.o(i._printf_pre_padding), UNUSED)
+<BR><BR>[Called By]<UL><LI><a href="#[dd]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;_printf_core
 </UL>
 <P>
 <H3>
